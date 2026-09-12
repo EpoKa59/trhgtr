@@ -5345,6 +5345,18 @@ task.spawn(function()
 	end
 end);
 -- white blox: Auto Replay V4.5 - exact PlayAgain only
+local function WHITE_BLOX_REPLAY_DEBUG(msg)
+    local text = "[white blox Replay] " .. tostring(msg)
+    print(text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Replay Debug",
+            Text = tostring(msg),
+            Duration = 3
+        })
+    end)
+end
+
 do
     local replayGui = v16:FindFirstChildOfClass("PlayerGui")
     local handled = false
@@ -5379,14 +5391,31 @@ do
         local dungeonStats = dungeonFrame and dungeonFrame:FindFirstChild("DungeonStats")
         local endActions = dungeonStats and dungeonStats:FindFirstChild("EndActions")
         local playAgain = endActions and endActions:FindFirstChild("PlayAgain")
+        if playAgain then
+            WHITE_BLOX_REPLAY_DEBUG("PlayAgain trouvé")
+        end
         return playAgain
     end
 
     local function realClick(button)
-        if handled or not v32.AutoReplay or not button or not button.Parent then return false end
-        if not button:IsA("ImageButton") then return false end
-        if not visibleThroughParents(button) then return false end
-        if not button.Visible or not button.Active or not button.Interactable then return false end
+        if handled then WHITE_BLOX_REPLAY_DEBUG("Bloqué: handled=true"); return false end
+        if not v32.AutoReplay then WHITE_BLOX_REPLAY_DEBUG("Bloqué: AutoReplay=false"); return false end
+        if not button or not button.Parent then WHITE_BLOX_REPLAY_DEBUG("Bloqué: bouton absent"); return false end
+        if not button:IsA("ImageButton") then WHITE_BLOX_REPLAY_DEBUG("Bloqué: pas ImageButton"); return false end
+
+        WHITE_BLOX_REPLAY_DEBUG(
+            "Visible=" .. tostring(button.Visible)
+            .. " Active=" .. tostring(button.Active)
+            .. " Interactable=" .. tostring(button.Interactable)
+            .. " ParentsVisible=" .. tostring(visibleThroughParents(button))
+        )
+
+        if not visibleThroughParents(button) then WHITE_BLOX_REPLAY_DEBUG("Bloqué: parent caché"); return false end
+        if not button.Visible or not button.Active or not button.Interactable then
+            WHITE_BLOX_REPLAY_DEBUG("Bloqué: état du bouton")
+            return false
+        end
+        WHITE_BLOX_REPLAY_DEBUG("realClick appelé")
 
         local size = button.AbsoluteSize
         local pos = button.AbsolutePosition
@@ -5407,12 +5436,14 @@ do
         local ok = false
 
         if mousemoveabs and mouse1click then
+            WHITE_BLOX_REPLAY_DEBUG("Méthode: mousemoveabs + mouse1click")
             ok = pcall(function()
                 mousemoveabs(x, y)
                 task.wait(0.03)
                 mouse1click()
             end)
         elseif mousemoveabs and mouse1press and mouse1release then
+            WHITE_BLOX_REPLAY_DEBUG("Méthode: mouse1press/release")
             ok = pcall(function()
                 mousemoveabs(x, y)
                 task.wait(0.03)
@@ -5424,6 +5455,7 @@ do
 
         -- Fallback to VirtualInputManager if the executor has no mouse primitives.
         if not ok then
+            WHITE_BLOX_REPLAY_DEBUG("Méthode: VirtualInputManager")
             ok = pcall(function()
                 local vim = game:GetService("VirtualInputManager")
                 vim:SendMouseMoveEvent(x, y, game)
@@ -5435,9 +5467,11 @@ do
         end
 
         if not ok then
+            WHITE_BLOX_REPLAY_DEBUG("ÉCHEC envoi du clic")
             handled = false
             return false
         end
+        WHITE_BLOX_REPLAY_DEBUG("Clic envoyé")
 
         -- pcall only tells us the input API accepted the call. If the result UI
         -- is still present, re-arm once for the next GUI event instead of staying locked forever.
