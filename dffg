@@ -5384,28 +5384,29 @@ do
 
     local function realClick(button)
         if handled or not v32.AutoReplay or not button or not button.Parent then return false end
+        if not button:IsA("ImageButton") then return false end
         if not visibleThroughParents(button) then return false end
+        if not button.Visible or not button.Active or not button.Interactable then return false end
 
         local size = button.AbsoluteSize
+        local pos = button.AbsolutePosition
         if size.X <= 0 or size.Y <= 0 then return false end
 
-        local pos = button.AbsolutePosition
-        local x = pos.X + size.X * 0.5
-        local y = pos.Y + size.Y * 0.5
+        handled = true -- lock before input
+        local x = math.floor(pos.X + size.X * 0.5)
+        local y = math.floor(pos.Y + size.Y * 0.5)
 
         local ok = pcall(function()
             local vim = game:GetService("VirtualInputManager")
             vim:SendMouseMoveEvent(x, y, game)
-            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
             task.wait()
+            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            task.wait(0.03)
             vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
         end)
 
-        if ok then
-            handled = true
-            return true
-        end
-        return false
+        if not ok then handled = false end
+        return ok
     end
 
     local function tryClick()
@@ -5436,11 +5437,11 @@ do
             end
         end
 
-        if button:IsA("GuiObject") then
-            watchedConnections[#watchedConnections + 1] =
-                button:GetPropertyChangedSignal("Visible"):Connect(changed)
-            watchedConnections[#watchedConnections + 1] =
-                button:GetPropertyChangedSignal("AbsoluteSize"):Connect(changed)
+        if button:IsA("ImageButton") then
+            for _, prop in ipairs({"Visible","Active","Interactable","AbsoluteSize","AbsolutePosition"}) do
+                watchedConnections[#watchedConnections + 1] =
+                    button:GetPropertyChangedSignal(prop):Connect(changed)
+            end
         end
 
         local cur = button.Parent
