@@ -5344,11 +5344,12 @@ task.spawn(function()
 		end
 	end
 end);
--- white blox: direct Auto Replay watcher
--- Watches only clickable GUI objects and clicks PlayAgain/Replay as soon as Roblox creates them.
+-- white blox: event-driven Auto Replay
+-- No permanent 0.02s GUI scan. It wakes only when the PlayerGui changes.
 do
     local replayGui = v16:FindFirstChildOfClass("PlayerGui")
     local replayLastClick = 0
+    local replayQueued = false
 
     local function replayText(obj)
         local out = string.lower(tostring(obj.Name or ""))
@@ -5364,8 +5365,7 @@ do
     end
 
     local function isEndRunContainer(obj)
-        local cur = obj
-        local depth = 0
+        local cur, depth = obj, 0
         while cur and cur ~= replayGui and depth < 8 do
             local n = string.lower(tostring(cur.Name or ""))
             if n:find("result",1,true)
@@ -5374,9 +5374,7 @@ do
                 or n:find("complete",1,true)
                 or n:find("finish",1,true)
                 or n:find("end",1,true) then
-                if not cur:IsA("GuiObject") or cur.Visible then
-                    return true
-                end
+                return true
             end
             cur = cur.Parent
             depth = depth + 1
@@ -5393,89 +5391,64 @@ do
             or t:find("replay",1,true) ~= nil
     end
 
-    local function directReplayClick(button)
-        if not v32.AutoReplay or not button or not button.Parent then return false end
-        if os.clock() - replayLastClick < 0.20 then return false end
-
+    local function clickReplay(button)
+        if not v32.AutoReplay or not button or not button.Parent then return end
+        if os.clock() - replayLastClick < 0.35 then return end
         replayLastClick = os.clock()
-        local fired = false
 
-        if firesignal then
-            pcall(function() firesignal(button.Activated); fired = true end)
-            pcall(function() firesignal(button.MouseButton1Click); fired = true end)
-        end
-        if getconnections then
-            pcall(function()
-                for _, c in ipairs(getconnections(button.Activated)) do c:Fire(); fired = true end
-            end)
-            pcall(function()
-                for _, c in ipairs(getconnections(button.MouseButton1Click)) do c:Fire(); fired = true end
-            end)
-        end
-        -- Real GUI click fallback: behaves like a fast autoclicker on the button itself.
-        -- This helps games whose UI logic listens to actual pointer input rather than
-        -- Activated/MouseButton1Click connections fired programmatically.
+        -- Use the method that actually worked, but only once when the end UI changes.
         pcall(function()
-            local pos = button.AbsolutePosition
-            local size = button.AbsoluteSize
+            local pos, size = button.AbsolutePosition, button.AbsoluteSize
             if size.X > 0 and size.Y > 0 then
-                local x = pos.X + (size.X * 0.5)
-                local y = pos.Y + (size.Y * 0.5)
+                local x, y = pos.X + size.X * 0.5, pos.Y + size.Y * 0.5
                 local vim = game:GetService("VirtualInputManager")
                 vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
                 vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
-                fired = true
             end
         end)
-
-        if not fired then
-            pcall(function() button:Activate(); fired = true end)
-        end
-        return fired
     end
 
-    local function scanReplayButtons()
+    local function scanOnce()
         if not v32.AutoReplay or not replayGui then return end
         for _, obj in ipairs(replayGui:GetDescendants()) do
             if isReplayButton(obj) then
-                directReplayClick(obj)
+                clickReplay(obj)
                 return
             end
         end
     end
 
-    if replayGui then
-        replayGui.DescendantAdded:Connect(function(obj)
-            if not v32.AutoReplay then return end
-
-            -- The button itself may be added first and its text one frame later.
-            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                task.defer(function()
-                    if isReplayButton(obj) then directReplayClick(obj) end
-                end)
-            elseif obj:IsA("TextLabel") then
-                local parent = obj.Parent
-                while parent and parent ~= replayGui do
-                    if parent:IsA("TextButton") or parent:IsA("ImageButton") then
-                        task.defer(function()
-                            if isReplayButton(parent) then directReplayClick(parent) end
-                        end)
-                        break
-                    end
-                    parent = parent.Parent
-                end
-            end
+    local function queueScan()
+        if replayQueued or not v32.AutoReplay then return end
+        replayQueued = true
+        task.defer(function()
+            -- Let text/size properties settle for one scheduler turn.
+            scanOnce()
+            replayQueued = false
         end)
     end
 
-    -- Fast fallback for UIs that reuse an already-created hidden button.
-    task.spawn(function()
-        while task.wait(0.02) do
-            if v32.AutoReplay then
-                scanReplayButtons()
+    if replayGui then
+        replayGui.DescendantAdded:Connect(queueScan)
+        replayGui.DescendantRemoving:Connect(queueScan)
+
+        -- Covers end screens that are pre-created and only toggled Visible.
+        for _, obj in ipairs(replayGui:GetDescendants()) do
+            if obj:IsA("GuiObject") then
+                obj:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if obj.Visible then queueScan() end
+                end)
             end
         end
-    end)
+
+        replayGui.DescendantAdded:Connect(function(obj)
+            if obj:IsA("GuiObject") then
+                obj:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if obj.Visible then queueScan() end
+                end)
+            end
+        end)
+    end
 end;
 v88:AddToggle({[v7("\148\187\39\0", "\62\218\218\74\101\30\205\146")]="Auto Farm Enemies / เปิดฟาร์มอัตโนมัติ",[v7("\102\172\127\240\200\50\80", "\79\34\201\25\145\189\94\36")]=v32.AutoFarm,[v7("\99\45\230\6\66\85\67\39", "\52\32\76\138\106\32")]=function(v679)
 	local v680 = 0 - 0;
