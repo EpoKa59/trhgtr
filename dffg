@@ -7115,6 +7115,80 @@ end});
 v99:AddParagraph({[v7("\54\31\24\122\54", "\83\98\118\108\22")]=v7("\104\222\77\2\229\167\15\104\194\84\109\140\170\5\102", "\67\41\139\25\77\197\228"),[v7("\203\161\192\62\83\230\252", "\136\136\206\174\74\54")]="Hourly 1-5 • Daily 1-5 • Weekly 1-5\nAuto mode checks every 12 seconds."});
 v100:AddParagraph({[v7("\24\165\160\134\126", "\168\76\204\212\234\27\174")]=v7("\190\33\4\101\59\194\14\184\54\18\103\34\195\124", "\46\236\100\83\36\105\134"),[v7("\26\245\137\148\132\1\45", "\111\89\154\231\224\225")]=v7("\201\200\7\166\39\234\156\222\243\214\31\229\2\220\235\145\244\206\3\168\63\185\221\213\249\223\2\229\56\246\156\248\243\204\3\171\56\246\206\200\189\219\0\177\41\235\156\197\245\223\70\177\62\248\223\218\248\200\70\172\63\185\221\195\240\223\2\235\108\208\200\212\240\201\70\183\41\250\217\216\235\223\2\229\47\245\211\194\248\154\18\170\43\252\200\217\248\200\70\164\62\252\156\214\239\213\19\181\41\253\156\216\243\206\9\229\35\247\217\145\216\212\1\169\37\234\212\145\217\211\21\166\35\235\216\145\248\215\4\160\40\183\156\244\229\211\21\177\37\247\219\145\255\219\1\229\47\246\210\197\248\212\18\182\108\248\206\212\189\211\1\171\35\235\217\213\179", "\177\157\186\102\197\76\153\188")});
 
+
+-- White Blox V6.4: Auto Skip Wave
+v32.AutoSkipWave = (v32.AutoSkipWave == true)
+
+local WHITE_BLOX_SKIP_WAVE_BUSY = false
+
+local function WHITE_BLOX_GET_SKIP_WAVE()
+    local pg = v16 and v16:FindFirstChildOfClass("PlayerGui")
+    local main = pg and pg:FindFirstChild("Main")
+    local dungeonFrame = main and main:FindFirstChild("DungeonFrame")
+    return dungeonFrame and dungeonFrame:FindFirstChild("SkipWave")
+end
+
+local function WHITE_BLOX_SKIP_WAVE_VISIBLE(button)
+    if not button or not button.Parent or not button:IsA("GuiButton") then return false end
+    local cur = button
+    while cur and cur ~= game do
+        if cur:IsA("GuiObject") and not cur.Visible then return false end
+        cur = cur.Parent
+    end
+    return button.Active ~= false
+end
+
+local function WHITE_BLOX_PRESS_SKIP_WAVE()
+    if WHITE_BLOX_SKIP_WAVE_BUSY then return false end
+    local button = WHITE_BLOX_GET_SKIP_WAVE()
+    if not WHITE_BLOX_SKIP_WAVE_VISIBLE(button) then return false end
+
+    WHITE_BLOX_SKIP_WAVE_BUSY = true
+    local ok = false
+    if firesignal then
+        pcall(function() firesignal(button.Activated); ok = true end)
+        pcall(function() firesignal(button.MouseButton1Click); ok = true end)
+    end
+    if (not ok) and getconnections then
+        pcall(function()
+            for _, c in ipairs(getconnections(button.Activated)) do
+                c:Fire()
+                ok = true
+            end
+        end)
+    end
+    if not ok then
+        pcall(function()
+            button:Activate()
+            ok = true
+        end)
+    end
+    task.delay(0.35, function()
+        WHITE_BLOX_SKIP_WAVE_BUSY = false
+    end)
+    return ok
+end
+
+task.spawn(function()
+    while task.wait(0.20) do
+        if v32.AutoSkipWave then
+            WHITE_BLOX_PRESS_SKIP_WAVE()
+        end
+    end
+end)
+
+v100:AddToggle({
+    ["Name"]="Auto Skip Wave",
+    ["Default"]=v32.AutoSkipWave,
+    ["Callback"]=function(v)
+        v32.AutoSkipWave = v and true or false
+        v37()
+        if v32.AutoSkipWave then
+            task.defer(WHITE_BLOX_PRESS_SKIP_WAVE)
+        end
+    end
+})
+
 -- white blox: Auto Card Select V2 (event-driven / low CPU)
 v32.AutoCardSelect = (v32.AutoCardSelect == true)
 v32.CardPriority = tostring(v32.CardPriority or "Rewards > Damage > Crit > Health > Time")
