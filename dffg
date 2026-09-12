@@ -1207,37 +1207,19 @@ v86:AddParagraph({
     ["Content"]=[[V4 PERFORMANCE
 
 ADDED
-• Auto Card Select: Rewards, Damage, Crit, Health and Time
-• Configurable Card Priority and selection delay
-• Target Priority: Nearest, Balanced, Lowest HP, Highest HP, Boss First, Specific Name
-• Target Max Distance and Target Stick Time
-• Instant retarget when the current mob dies/disappears
-• Auto Dodge, Auto Safety and Smart Skills options
-• GitHub dffg re-execute source
+• Single-pass Target Priority processing to reduce CPU usage
+• More selective Auto Card GUI change detection
 
 CHANGED
-• Branding changed to white blox
-• Target selection made more responsive and deterministic
-• Auto Card detection optimized to reduce GUI scanning
-• Target lock clears immediately when targeting settings change
-
-REMOVED
-• Security Guard / telemetry blocks
-• Discord section and Discord link
-• Old hub status/developer INFO content
-• Remaining XDFLEX HUB visible branding
+• Optimized enemy target scanning to avoid rebuilding temporary candidate tables
+• Reduced unnecessary Auto Card background scans
+• Auto Card fallback scan interval increased from 0.20s to 0.35s
+• Auto Card no longer forces an immediate GUI rescan after a successful card selection
 
 BUG FIXES
-• Fixed extra end); syntax error
-• Fixed invalid identifiers after rebranding
-• Fixed obfuscated XDFLEX HUB titles
-• Fixed Target Priority behavior
-• Fixed dead mobs remaining sticky
-• Fixed Auto Card GUI scanning lag
-• Fixed INFO update accidentally removing the other tab section declarations
-• Fixed re-execute retrying a partially failing script several times
-• Reduced temporary allocations in Target Priority
-• Reduced Auto Card background GUI work]]
+• Reduced lag caused by repeated target calculations
+• Reduced lag caused by unnecessary PlayerGui scanning
+• Kept the single dungeon-change Re-Execute system from V3.9]]
 });
 local v103 = {};
 local v104 = false;
