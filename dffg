@@ -5396,20 +5396,39 @@ do
         local x = math.floor(pos.X + size.X * 0.5)
         local y = math.floor(pos.Y + size.Y * 0.5)
 
-        -- Same physical-style click method that worked in V3.8:
-        -- move pointer onto PlayAgain, press mouse button, release it.
-        local ok = pcall(function()
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendMouseMoveEvent(x, y, game)
-            task.wait(0.02)
-            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
-            task.wait(0.05)
-            vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        end)
+        -- Real pointer click. Prefer executor mouse primitives when available,
+        -- because some Roblox UIs ignore synthetic Activated/firesignal events.
+        local ok = false
 
-        if not ok then
-            handled = false
+        if mousemoveabs and mouse1click then
+            ok = pcall(function()
+                mousemoveabs(x, y)
+                task.wait(0.03)
+                mouse1click()
+            end)
+        elseif mousemoveabs and mouse1press and mouse1release then
+            ok = pcall(function()
+                mousemoveabs(x, y)
+                task.wait(0.03)
+                mouse1press()
+                task.wait(0.05)
+                mouse1release()
+            end)
         end
+
+        -- Fallback to VirtualInputManager if the executor has no mouse primitives.
+        if not ok then
+            ok = pcall(function()
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendMouseMoveEvent(x, y, game)
+                task.wait(0.03)
+                vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+                task.wait(0.05)
+                vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            end)
+        end
+
+        if not ok then handled = false end
         return ok
     end
 
