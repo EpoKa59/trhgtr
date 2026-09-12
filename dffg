@@ -5407,8 +5407,32 @@ do
         end)
     end
 
+    local function findExactPlayAgain()
+        if not replayGui then return nil end
+        for _, dungeonFrame in ipairs(replayGui:GetDescendants()) do
+            if dungeonFrame.Name == "DungeonFrame" then
+                local stats = dungeonFrame:FindFirstChild("DungeonStats")
+                local actions = stats and stats:FindFirstChild("EndActions")
+                local playAgain = actions and actions:FindFirstChild("PlayAgain")
+                if playAgain and (playAgain:IsA("TextButton") or playAgain:IsA("ImageButton")) then
+                    return playAgain
+                end
+            end
+        end
+        return nil
+    end
+
     local function scanVisibleReplay()
         if replayLocked or not v32.AutoReplay or not replayGui then return end
+
+        -- Exact game hierarchy first: DungeonFrame > DungeonStats > EndActions > PlayAgain
+        local exact = findExactPlayAgain()
+        if exact and isActuallyVisible(exact) then
+            clickOnce(exact)
+            return
+        end
+
+        -- Generic fallback in case the UI hierarchy changes later.
         for _, obj in ipairs(replayGui:GetDescendants()) do
             if isReplayButton(obj) then
                 clickOnce(obj)
@@ -5444,7 +5468,15 @@ do
         end
         replayGui.DescendantAdded:Connect(function(obj)
             watch(obj)
-            queueScan()
+            if obj.Name == "PlayAgain" then
+                task.defer(function()
+                    if v32.AutoReplay and isActuallyVisible(obj) then
+                        clickOnce(obj)
+                    end
+                end)
+            else
+                queueScan()
+            end
         end)
     end
 end;
