@@ -5393,8 +5393,14 @@ do
         if size.X <= 0 or size.Y <= 0 then return false end
 
         handled = true -- lock before input
-        local x = math.floor(pos.X + size.X * 0.5)
-        local y = math.floor(pos.Y + size.Y * 0.5)
+
+        -- Convert GUI viewport coordinates to screen coordinates for real pointer input.
+        local inset = Vector2.new(0, 0)
+        pcall(function()
+            inset = game:GetService("GuiService"):GetGuiInset()
+        end)
+        local x = math.floor(pos.X + size.X * 0.5 + inset.X)
+        local y = math.floor(pos.Y + size.Y * 0.5 + inset.Y)
 
         -- Real pointer click. Prefer executor mouse primitives when available,
         -- because some Roblox UIs ignore synthetic Activated/firesignal events.
@@ -5428,8 +5434,19 @@ do
             end)
         end
 
-        if not ok then handled = false end
-        return ok
+        if not ok then
+            handled = false
+            return false
+        end
+
+        -- pcall only tells us the input API accepted the call. If the result UI
+        -- is still present, re-arm once for the next GUI event instead of staying locked forever.
+        task.delay(0.20, function()
+            if button and button.Parent and visibleThroughParents(button) then
+                handled = false
+            end
+        end)
+        return true
     end
 
     local function tryClick()
