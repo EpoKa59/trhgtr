@@ -5492,6 +5492,27 @@ do
     if replayGui then
         refreshExactButton()
 
+        -- V6.9: reliability fallback for end screens that Roblox reuses without
+        -- firing the expected visibility/ancestry events.
+        -- Checks only the exact PlayAgain hierarchy; no full GUI scan, no mouse movement.
+        task.spawn(function()
+            while task.wait(0.35) do
+                if v32.AutoReplay then
+                    local button = exactPlayAgain()
+                    if button then
+                        if watchedButton ~= button then
+                            watchButton(button)
+                        end
+                        tryClick()
+                    else
+                        handled = false
+                    end
+                else
+                    handled = false
+                end
+            end
+        end)
+
         -- Only react when this exact object/hierarchy appears.
         replayGui.DescendantAdded:Connect(function(obj)
             if obj.Name == "PlayAgain"
