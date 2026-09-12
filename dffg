@@ -5497,7 +5497,7 @@ do
         -- Checks only the exact PlayAgain hierarchy; no full GUI scan, no mouse movement.
         task.spawn(function()
             while task.wait(0.35) do
-                if v32.AutoReplay then
+                if v32.AutoReplay and WHITE_BLOX_IN_DUNGEON() then
                     local button = exactPlayAgain()
                     if button then
                         if watchedButton ~= button then
@@ -7136,6 +7136,18 @@ local function WHITE_BLOX_CURRENT_TARGET_OR(candidate)
     return candidate
 end
 
+-- White Blox V7: dungeon-only automation gate.
+local function WHITE_BLOX_IN_DUNGEON()
+    local pg = v16 and v16:FindFirstChildOfClass("PlayerGui")
+    local main = pg and pg:FindFirstChild("Main")
+    local dungeonFrame = main and main:FindFirstChild("DungeonFrame")
+    if not dungeonFrame then return false end
+    if dungeonFrame:IsA("GuiObject") and not dungeonFrame.Visible then return false end
+    return dungeonFrame:FindFirstChild("Bonuses") ~= nil
+        or dungeonFrame:FindFirstChild("SkipWave") ~= nil
+        or dungeonFrame:FindFirstChild("DungeonStats") ~= nil
+end
+
 -- White Blox V6.4: Auto Skip Wave
 v32.AutoSkipWave = (v32.AutoSkipWave == true)
 
@@ -7191,7 +7203,7 @@ end
 
 task.spawn(function()
     while task.wait(0.20) do
-        if v32.AutoSkipWave then
+        if v32.AutoSkipWave and WHITE_BLOX_IN_DUNGEON() then
             WHITE_BLOX_PRESS_SKIP_WAVE()
         end
     end
@@ -7343,7 +7355,7 @@ end
 -- Lightweight fallback. 0.20 s is still effectively instant for a card-selection screen.
 task.spawn(function()
     while task.wait(0.20) do
-        if v32.AutoCardSelect and not WHITE_BLOX_CARD_BUSY and (os.clock() - WHITE_BLOX_CARD_LAST) >= 0.75 then
+        if v32.AutoCardSelect and WHITE_BLOX_IN_DUNGEON() and not WHITE_BLOX_CARD_BUSY and (os.clock() - WHITE_BLOX_CARD_LAST) >= 0.75 then
             local card = WHITE_BLOX_FindCard()
             if card then
                 WHITE_BLOX_CARD_BUSY = true
