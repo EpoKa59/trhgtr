@@ -7321,7 +7321,7 @@ local function WHITE_BLOX_ADD_PRIORITY_DROPDOWN(number, key)
     v98:AddDropdown({
         ["Name"]="Priority " .. tostring(number),
         ["Default"]=v32[key],
-        ["Options"]=WHITE_BLOX_CARD_TYPES,
+        ["Values"]=WHITE_BLOX_CARD_TYPES,
         ["Multi"]=false,
         ["Callback"]=function(v)
             local selected = ((type(v) == "table") and (v[1] or next(v))) or v
