@@ -7268,7 +7268,7 @@ task.spawn(function()
     end
 end)
 
-v98:AddParagraph({["Title"]="Card Selection V2",["Content"]="Low-CPU auto selection. Recognizes Rewards, Damage, Crit, Health and Time."})
+v98:AddParagraph({["Title"]="Card Selection V2",["Content"]="Choose which card type has priority. All options are shown with short names."})
 v98:AddToggle({
     ["Name"]="Auto Card Select",
     ["Default"]=v32.AutoCardSelect,
@@ -7278,23 +7278,71 @@ v98:AddToggle({
         v37()
     end
 })
-v98:AddDropdown({
-    ["Name"]="Card Priority",
-    ["Default"]=v32.CardPriority,
-    ["Options"]={
-        "Rewards > Damage > Crit > Health > Time",
-        "Damage > Crit > Rewards > Health > Time",
-        "Crit > Damage > Rewards > Health > Time",
-        "Health > Rewards > Damage > Crit > Time",
-        "Time > Rewards > Damage > Crit > Health",
-        "First Recognized"
-    },
-    ["Multi"]=false,
-    ["Callback"]=function(v)
-        v32.CardPriority = tostring(v)
-        v37()
+-- Custom Auto Card priority.
+-- The player chooses Priority 1 through Priority 5 independently.
+local WHITE_BLOX_CARD_TYPES = {"Rewards", "Damage", "Crit", "Health", "Time"}
+
+v32.CardPriority1 = tostring(v32.CardPriority1 or "Rewards")
+v32.CardPriority2 = tostring(v32.CardPriority2 or "Damage")
+v32.CardPriority3 = tostring(v32.CardPriority3 or "Crit")
+v32.CardPriority4 = tostring(v32.CardPriority4 or "Health")
+v32.CardPriority5 = tostring(v32.CardPriority5 or "Time")
+
+local function WHITE_BLOX_UPDATE_CUSTOM_CARD_ORDER()
+    local chosen = {
+        tostring(v32.CardPriority1),
+        tostring(v32.CardPriority2),
+        tostring(v32.CardPriority3),
+        tostring(v32.CardPriority4),
+        tostring(v32.CardPriority5)
+    }
+
+    -- Remove duplicates while preserving the player's order,
+    -- then append any card types they did not select.
+    local final, seen = {}, {}
+    for _, kind in ipairs(chosen) do
+        if table.find(WHITE_BLOX_CARD_TYPES, kind) and not seen[kind] then
+            seen[kind] = true
+            final[#final + 1] = kind
+        end
     end
+    for _, kind in ipairs(WHITE_BLOX_CARD_TYPES) do
+        if not seen[kind] then
+            final[#final + 1] = kind
+        end
+    end
+
+    v32.CardPriority = table.concat(final, " > ")
+    WHITE_BLOX_CARD_ORDERS[v32.CardPriority] = final
+    v37()
+end
+
+local function WHITE_BLOX_ADD_PRIORITY_DROPDOWN(number, key)
+    v98:AddDropdown({
+        ["Name"]="Priority " .. tostring(number),
+        ["Default"]=v32[key],
+        ["Options"]=WHITE_BLOX_CARD_TYPES,
+        ["Multi"]=false,
+        ["Callback"]=function(v)
+            local selected = ((type(v) == "table") and (v[1] or next(v))) or v
+            v32[key] = tostring(selected)
+            WHITE_BLOX_UPDATE_CUSTOM_CARD_ORDER()
+        end
+    })
+end
+
+v98:AddParagraph({
+    ["Title"]="Custom Card Priority",
+    ["Content"]="Choose your own order from Priority 1 (highest) to Priority 5 (lowest)."
 })
+
+WHITE_BLOX_ADD_PRIORITY_DROPDOWN(1, "CardPriority1")
+WHITE_BLOX_ADD_PRIORITY_DROPDOWN(2, "CardPriority2")
+WHITE_BLOX_ADD_PRIORITY_DROPDOWN(3, "CardPriority3")
+WHITE_BLOX_ADD_PRIORITY_DROPDOWN(4, "CardPriority4")
+WHITE_BLOX_ADD_PRIORITY_DROPDOWN(5, "CardPriority5")
+WHITE_BLOX_UPDATE_CUSTOM_CARD_ORDER()
+
 v98:AddSlider({
     ["Name"]="Card Select Delay",
     ["Min"]=0,
