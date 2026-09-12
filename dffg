@@ -5345,17 +5345,7 @@ task.spawn(function()
 	end
 end);
 -- white blox: Auto Replay V4.5 - exact PlayAgain only
-local function WHITE_BLOX_REPLAY_DEBUG(msg)
-    local text = "[white blox Replay] " .. tostring(msg)
-    print(text)
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Replay Debug",
-            Text = tostring(msg),
-            Duration = 3
-        })
-    end)
-end
+local function WHITE_BLOX_REPLAY_DEBUG(msg) end
 
 do
     local replayGui = v16:FindFirstChildOfClass("PlayerGui")
@@ -5440,40 +5430,12 @@ do
         local x = math.floor(pos.X + size.X * 0.5 + inset.X)
         local y = math.floor(pos.Y + size.Y * 0.5 + inset.Y)
 
-        -- Real pointer click. Prefer executor mouse primitives when available,
-        -- because some Roblox UIs ignore synthetic Activated/firesignal events.
-        local ok = false
+        -- Keep the user's physical cursor untouched.
+        -- The exact PlayAgain button was already activated above through its GUI signals.
+        local ok = true
 
-        if mousemoveabs and mouse1click then
-            WHITE_BLOX_REPLAY_DEBUG("Méthode: mousemoveabs + mouse1click")
-            ok = pcall(function()
-                mousemoveabs(x, y)
-                task.wait(0.03)
-                mouse1click()
-            end)
-        elseif mousemoveabs and mouse1press and mouse1release then
-            WHITE_BLOX_REPLAY_DEBUG("Méthode: mouse1press/release")
-            ok = pcall(function()
-                mousemoveabs(x, y)
-                task.wait(0.03)
-                mouse1press()
-                task.wait(0.05)
-                mouse1release()
-            end)
-        end
-
-        -- Also send VirtualInputManager input. V3.8 combined GUI activation
-        -- with a pointer click, which is the version that actually replayed.
-        WHITE_BLOX_REPLAY_DEBUG("Méthode complémentaire: VirtualInputManager")
-        local vimOk = pcall(function()
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendMouseMoveEvent(x, y, game)
-            task.wait(0.03)
-            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
-            task.wait(0.05)
-            vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        end)
-        ok = ok or vimOk
+        -- No SendMouseMoveEvent / mousemoveabs here: preserve mouse control.
+        -- Activated and MouseButton1Click signals above perform the simulated GUI click.
 
         if not ok then
             WHITE_BLOX_REPLAY_DEBUG("ÉCHEC envoi du clic")
