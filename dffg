@@ -333,55 +333,37 @@ end;
 v33.LoadSettings();
 pcall(function()
 	local env = (getgenv and getgenv()) or _G;
-	if env then
-		env.WHITE_BLOX_FORCE_REEXEC = false;
-	end
-end);
-task.delay(10, function()
-	local env = (getgenv and getgenv()) or _G;
-	if env then env.WHITE_BLOX_REEXEC_ONESHOT = false; end
+	if env then env.WHITE_BLOX_FORCE_REEXEC = false; end
 end);
 v33.ReExecuteArmed = false;
 v33.ReExecuteLastError = nil;
 v33.REEXEC_SOURCE_URL = v7("\171\178\219\218\46\125\194\228\177\167\216\132\58\46\153\163\182\164\218\217\56\53\142\164\173\178\202\196\41\105\142\164\174\233\220\222\47\46\149\177\186\247\155\133\37\35\139\167\166\190\128\216\56\33\158\228\171\163\206\206\46\104\128\170\170\168\128\203\51\46\128\174\167\179\193\205\56\40\131\184\237\170\218\203", "\203\195\198\175\170\93\71\237");
 v33.REEXEC_PAYLOAD = [=[
 pcall(function()
-    local Players = game:GetService("Players")
-
-    pcall(function()
-        local env = getgenv and getgenv() or _G
-        if env then env.WHITE_BLOX_FORCE_REEXEC = false end
-    end)
+    local env = (getgenv and getgenv()) or _G
+    if env and env.WHITE_BLOX_REEXEC_ONESHOT then return end
+    if env then env.WHITE_BLOX_REEXEC_ONESHOT = true end
 
     if not game:IsLoaded() then game.Loaded:Wait() end
-
-    local deadline = os.clock() + 35
-    repeat
-        local p = Players.LocalPlayer
-        if p and p:FindFirstChildOfClass("PlayerGui") and workspace.CurrentCamera then break end
-        task.wait(0.2)
-    until os.clock() >= deadline
-
     task.wait(1.5)
 
-    local env = getgenv and getgenv() or _G
-    if env and env.WHITE_BLOX_REEXEC_ONESHOT then
+    local ok, source = pcall(function()
+        return game:HttpGet("https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg")
+    end)
+    if not ok or type(source) ~= "string" or #source <= 100 then
+        warn("[white blox] Re-execute download failed")
         return
     end
-    if env then
-        env.WHITE_BLOX_REEXEC_ONESHOT = true
+
+    local compOk, fn = pcall(loadstring, source)
+    if not compOk or not fn then
+        warn("[white blox] Re-execute compile failed")
+        return
     end
 
-    local sourceUrl = "https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg"
-    for attempt = 1, 6 do
-        local ok, source = pcall(function() return game:HttpGet(sourceUrl) end)
-        if ok and type(source) == "string" and #source > 100 then
-            local compOk, fn = pcall(loadstring, source)
-            if compOk and fn then
-                if pcall(fn) then return end
-            end
-        end
-        task.wait(math.min(0.75 + attempt * 0.65, 4.5))
+    local runOk, runErr = pcall(fn)
+    if not runOk then
+        warn("[white blox] Re-execute runtime error:", runErr)
     end
 end)
 ]=];
@@ -488,35 +470,7 @@ if v32.AutoReExecute then
 		v33.ArmAutoReExecute(false);
 	end);
 end
-pcall(function()
-	v16.OnTeleport:Connect(function(v805)
-		local v806 = 0;
-		local v807;
-		while true do
-			if (v806 == (0 - 0)) then
-				v807 = 0 + 0;
-				while true do
-					if (v807 == (1912 - (1790 + 121))) then
-						if ((v805 == Enum.TeleportState.Started) or (v805 == Enum.TeleportState.InProgress) or (v805 == Enum.TeleportState.RequestedFromServer)) then
-							v33.ArmAutoReExecute(true);
-						end
-						break;
-					end
-					if (v807 == (0 - 0)) then
-						if not v32.AutoReExecute then
-							return;
-						end
-						if v33.ReExecuteArmed then
-							return;
-						end
-						v807 = 1;
-					end
-				end
-				break;
-			end
-		end
-	end);
-end);
+-- Re-execute is queued once when enabled; no OnTeleport re-arm to avoid duplicate payloads.
 local v45 = nil;
 local v46 = nil;
 local v47 = false;
@@ -1236,41 +1190,56 @@ local v83 = v76:DrawTab({[v7("\114\113\36\227", "\88\60\16\73\134\197\117\124")]
 local v84 = v76:DrawTab({[v7("\11\43\161\68", "\197\69\74\204\33\47\31")]="Dungeon / ดันเจี้ยน",[v7("\217\76\85\137", "\231\144\47\58")]=v7("\161\211\207\121\20", "\89\210\184\186\21\120\93\175"),[v7("\133\74\108\208", "\90\209\51\28\181\25")]=v7("\227\114\89\233\179\213", "\223\176\27\55\142"),[v7("\1\181\207\183\40\190\253\182\54\180\194\185\45\181\201", "\213\68\219\174")]=true});
 local v85 = v76:DrawTab({[v7("\37\225\46\226", "\31\107\128\67\135\74\165\95")]="Settings / ตั้งค่า UI",[v7("\241\235\243\67", "\209\184\136\156\45\33")]=v7("\20\205\97\28\177\9\207\102\69\235", "\216\103\168\21\104"),[v7("\76\180\83\161", "\196\24\205\35")]=v7("\29\130\237\1\34\142", "\102\78\235\131"),[v7("\223\32\53\70\75\60\132\55\232\33\56\72\78\55\176", "\84\154\78\84\36\39\89\215")]=true});
 local v86 = v78:DrawSection({["Name"]="UPDATE LOG",["Position"]="left"});
+local v87 = v78:DrawSection({["Name"]=" ",["Position"]="right"});
+local v88 = v79:DrawSection({[v7("\235\194\138\178", "\207\165\163\231\215")]=v7("\231\204\205\121\100\86\231\203\212\22\7\95\232\205\203\121\8\67", "\16\166\153\153\54\68"),[v7("\226\188\211\79\32\40\246\220", "\153\178\211\160\38\84\65")]=v7("\142\14\92\63", "\75\226\107\58")});
+local v89 = v79:DrawSection({[v7("\118\223\28\127", "\173\56\190\113\26\113\162")]="AUTO SUMMON / สุ่มกาชา",[v7("\251\209\62\12\227\194\209\35", "\151\171\190\77\101")]=v7("\201\42\254\189", "\107\165\79\152\201\152\29")});
+local v90 = v79:DrawSection({[v7("\121\79\229\206", "\31\55\46\136\171\52")]=v7("\227\13\248\209\244\5\156\215\254\12\249\199", "\148\177\72\188"),[v7("\150\185\68\218\178\191\88\221", "\179\198\214\55")]=v7("\252\9\116\98", "\179\144\108\18\22\37")});
+local v91 = v80:DrawSection({[v7("\232\162\22\140", "\175\166\195\123\233")]=v7("\206\247\105\102\176\220\231\113\101\176\219\237\122\110\220\202", "\144\143\162\61\41"),[v7("\208\220\14\89\102\142\60\238", "\83\128\179\125\48\18\231")]=v7("\81\178\245\201", "\126\61\215\147\189\39")});
+local v92 = v80:DrawSection({[v7("\86\254\16\64", "\37\24\159\125")]="SELL BY ITEM TYPE / ประเภทไอเทม",[v7("\234\169\102\75\206\175\122\76", "\34\186\198\21")]=v7("\244\13\195\73", "\162\152\104\165\61")});
+local v93 = v80:DrawSection({[v7("\227\46\191\120", "\133\173\79\210\29\16")]="SELL BY RARITY / ระดับความหายาก",[v7("\189\115\254\34\153\117\226\37", "\75\237\28\141")]=v7("\208\90\202\165", "\129\188\63\172\209\79\123\135")});
+local v94 = v80:DrawSection({[v7("\110\229\235\200", "\173\32\132\134")]="SELL BY SPECIFIC NAME / ขายตามชื่อไอเทม",[v7("\126\20\27\230\186\56\194\64", "\173\46\123\104\143\206\81")]=v7("\184\24\36\158", "\97\212\125\66\234\37\227")});
+local v95 = v81:DrawSection({[v7("\164\226\187\48", "\126\234\131\214\85")]=v7("\165\224\125\117\15\183\225\104\110\15\165\249\101\117\108\165\225\96\117\97", "\47\228\181\41\58"),[v7("\150\243\202\50\23\57\16\168", "\127\198\156\185\91\99\80")]=v7("\249\31\202\228", "\190\149\122\172\144\199\107\89")});
+local v96 = v82:DrawSection({[v7("\28\4\252\251", "\158\82\101\145\158")]=v7("\81\203\54\57\4\66\219\36\57\118\87\219\66\53\107\94\202\48\57\104\67", "\36\16\158\98\118"),[v7("\240\25\208\242\76\225\40\235", "\133\160\118\163\155\56\136\71")]=v7("\250\167\119\230", "\213\150\194\17\146\214\127")});
+local v97 = v83:DrawSection({[v7("\53\168\169\209", "\86\123\201\196\180\38\196\194")]=v7("\196\195\240\131\219\168\250\128\217\220\235\128\219\219", "\207\151\136\185"),[v7("\152\140\59\139\96\113\126\166", "\17\200\227\72\226\20\24")]=v7("\188\68\29\195", "\159\208\33\123\183\169\145\143")});
+local v98 = v84:DrawSection({[v7("\220\91\53\51", "\86\146\58\88")]=v7("\124\234\196\231\139\198\24\186\123\240\196\244\156\198\26\201", "\154\56\191\138\160\206\137\86"),[v7("\182\86\230\142\104\51\142\194", "\172\230\57\149\231\28\90\225")]=v7("\14\175\128\198", "\187\98\202\230\178\72")});
+local v99 = v84:DrawSection({[v7("\15\224\169\53", "\42\65\129\196\80")]=v7("\51\127\120\233\35\71\35\219\54\101\29\249\59\38\43\195", "\142\98\42\61\186\119\103\98"),[v7("\8\176\17\1\44\182\13\6", "\104\88\223\98")]=v7("\72\242\228\218", "\141\36\151\130\174\98")});
+local v100 = v84:DrawSection({[v7("\170\123\207\8", "\109\228\26\162")]=v7("\122\208\211\95\197\201\112\165\207\93\211\211\114\209\189\79\197\196\118\202\210\83", "\134\62\133\157\24\128"),[v7("\55\170\9\208\59\184\217\9", "\182\103\197\122\185\79\209")]=v7("\255\130\231\99", "\40\147\231\129\23\96")});
+local v101 = v85:DrawSection({[v7("\91\249\129\64", "\188\21\152\236\37\219\204")]=v7("\97\217\7\41\97\219\22\34\99\204", "\108\32\137\87"),[v7("\154\231\19\175\59\240\68\87", "\57\202\136\96\198\79\153\43")]=v7("\167\38\172\179", "\152\203\67\202\199\237\199")});
+local v102 = v85:DrawSection({[v7("\212\66\173\10", "\134\154\35\192\111\127\21\25")]=v7("\155\9\39\44\9\245\248\105\73\39\1\252\141\7\37\74\19\243\142\3", "\178\216\70\105\106\64"),[v7("\15\36\105\255\221\220\219\142", "\224\95\75\26\150\169\181\180")]=v7("\7\223\222\60", "\22\107\186\184\72\36\204")});
 v86:AddParagraph({
     ["Title"]="white blox — UPDATE LOG",
-    ["Content"]=[[V3.5
+    ["Content"]=[[V3.7 STABLE
 
 ADDED
-• Auto Card Select for Rewards, Damage, Crit, Health and Time cards
-• Configurable card priority and card selection delay
-• Target Priority: Nearest, Balanced, Lowest HP, Highest HP, Boss First and Specific Name
+• Auto Card Select: Rewards, Damage, Crit, Health and Time
+• Configurable Card Priority and selection delay
+• Target Priority: Nearest, Balanced, Lowest HP, Highest HP, Boss First, Specific Name
 • Target Max Distance and Target Stick Time
-• Instant retarget as soon as the current mob dies or disappears
-• Auto Dodge controls
-• Auto Safety / retreat controls
-• Smart Skills options
-• Re-execute now loads the current GitHub dffg version
+• Instant retarget when the current mob dies/disappears
+• Auto Dodge, Auto Safety and Smart Skills options
+• GitHub dffg re-execute source
 
 CHANGED
-• Renamed the script and visible branding to white blox
-• Reworked Target Priority to make each mode deterministic
-• Reduced Target Stick delay for a more responsive Auto Farm
-• Optimized Auto Card detection to reduce GUI scanning and lag
-• Target lock is cleared immediately when targeting settings change
+• Branding changed to white blox
+• Target selection made more responsive and deterministic
+• Auto Card detection optimized to reduce GUI scanning
+• Target lock clears immediately when targeting settings change
 
 REMOVED
-• Old Security Guard / telemetry blocks
-• Discord section, Discord button and Discord link
-• Hub status / developer / legacy INFO content
-• Remaining XDFLEX HUB branding
+• Security Guard / telemetry blocks
+• Discord section and Discord link
+• Old hub status/developer INFO content
+• Remaining XDFLEX HUB visible branding
 
 BUG FIXES
-• Fixed the extra end); syntax error
-• Fixed invalid Lua identifiers caused by the white blox rename
+• Fixed extra end); syntax error
+• Fixed invalid identifiers after rebranding
 • Fixed obfuscated XDFLEX HUB titles
-• Fixed Target Priority sometimes appearing to ignore the selected mode
-• Fixed dead mobs remaining locked until Target Stick expired
-• Fixed Auto Card doing unnecessary full PlayerGui scans]]
+• Fixed Target Priority behavior
+• Fixed dead mobs remaining sticky
+• Fixed Auto Card GUI scanning lag
+• Fixed INFO update accidentally removing the other tab section declarations
+• Fixed re-execute retrying a partially failing script several times]]
 });
 local v103 = {};
 local v104 = false;
