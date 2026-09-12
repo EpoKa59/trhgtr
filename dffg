@@ -5390,6 +5390,22 @@ do
                 for _, c in ipairs(getconnections(button.MouseButton1Click)) do c:Fire(); fired = true end
             end)
         end
+        -- Real GUI click fallback: behaves like a fast autoclicker on the button itself.
+        -- This helps games whose UI logic listens to actual pointer input rather than
+        -- Activated/MouseButton1Click connections fired programmatically.
+        pcall(function()
+            local pos = button.AbsolutePosition
+            local size = button.AbsoluteSize
+            if size.X > 0 and size.Y > 0 then
+                local x = pos.X + (size.X * 0.5)
+                local y = pos.Y + (size.Y * 0.5)
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+                vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+                fired = true
+            end
+        end)
+
         if not fired then
             pcall(function() button:Activate(); fired = true end)
         end
