@@ -1249,6 +1249,68 @@ local v101 = v85:DrawSection({[v7("\91\249\129\64", "\188\21\152\236\37\219\204"
 local v102 = v85:DrawSection({[v7("\212\66\173\10", "\134\154\35\192\111\127\21\25")]=v7("\155\9\39\44\9\245\248\105\73\39\1\252\141\7\37\74\19\243\142\3", "\178\216\70\105\106\64"),[v7("\15\36\105\255\221\220\219\142", "\224\95\75\26\150\169\181\180")]=v7("\7\223\222\60", "\22\107\186\184\72\36\204")});
 v86:AddParagraph({[v7("\211\180\48\66\11", "\110\135\221\68\46")]="White Blox V5.7",[v7("\216\36\182\3\88\245\63", "\61\155\75\216\119")]="• Auto Replay: fixed without moving your mouse\n• Auto Card Select V2\n• Target Priority / instant retarget\n• Notifications removed\n• Discord section removed\n• Dungeon webhook sender disabled\n• Branding restored to White Blox"});
 v86:AddParagraph({[v7("\24\8\200\63\116", "\17\76\97\188\83")]=v7("\161\14\235\18\19\183\11\138\171\17\240\3\21\195\103\138\171\12", "\195\229\71\185\87\80\227\43"),[v7("\195\243\14\68\234\238\232", "\143\128\156\96\48")]=v7("\176\197\228\2\4\226\158\191\22\30\171\210\255\0\19\246\214\247\93\7\185\230\199\55\69\182\235\234\20", "\119\216\177\144\114")});
+
+-- White Blox V5.9: low-cost dungeon card cache.
+-- Exact hierarchy: PlayerGui > Main > DungeonFrame > Bonuses > Bonus1/Bonus2/Bonus3.
+local WHITE_BLOX_CARD_CACHE = {}
+local WHITE_BLOX_CARD_CONNECTIONS = {}
+
+local function WHITE_BLOX_GET_BONUSES()
+    local pg = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+    local main = pg and pg:FindFirstChild("Main")
+    local dungeonFrame = main and main:FindFirstChild("DungeonFrame")
+    return dungeonFrame and dungeonFrame:FindFirstChild("Bonuses")
+end
+
+local function WHITE_BLOX_REFRESH_CARD(slot)
+    if not slot then return end
+    local nameObj = slot:FindFirstChild("BonusName")
+    local descObj = slot:FindFirstChild("BonusDescription")
+    local nameText = (nameObj and nameObj.Text) or ""
+    local descText = (descObj and descObj.Text) or ""
+    WHITE_BLOX_CARD_CACHE[slot.Name] = {
+        Slot = slot,
+        Name = nameText,
+        Description = descText,
+        SearchText = string.lower(nameText .. " " .. descText)
+    }
+end
+
+local function WHITE_BLOX_BIND_CARD(slot)
+    if not slot or WHITE_BLOX_CARD_CONNECTIONS[slot] then return end
+    WHITE_BLOX_REFRESH_CARD(slot)
+    local cons = {}
+    WHITE_BLOX_CARD_CONNECTIONS[slot] = cons
+    local nameObj = slot:FindFirstChild("BonusName")
+    local descObj = slot:FindFirstChild("BonusDescription")
+    if nameObj and nameObj:IsA("TextLabel") then
+        table.insert(cons, nameObj:GetPropertyChangedSignal("Text"):Connect(function()
+            WHITE_BLOX_REFRESH_CARD(slot)
+        end))
+    end
+    if descObj and descObj:IsA("TextLabel") then
+        table.insert(cons, descObj:GetPropertyChangedSignal("Text"):Connect(function()
+            WHITE_BLOX_REFRESH_CARD(slot)
+        end))
+    end
+end
+
+task.spawn(function()
+    local bonuses
+    repeat
+        bonuses = WHITE_BLOX_GET_BONUSES()
+        if not bonuses then task.wait(1) end
+    until bonuses
+    for _, slotName in ipairs({"Bonus1", "Bonus2", "Bonus3"}) do
+        WHITE_BLOX_BIND_CARD(bonuses:FindFirstChild(slotName))
+    end
+    bonuses.ChildAdded:Connect(function(child)
+        if child.Name == "Bonus1" or child.Name == "Bonus2" or child.Name == "Bonus3" then
+            task.defer(WHITE_BLOX_BIND_CARD, child)
+        end
+    end)
+end)
+
 local v103 = {};
 local v104 = false;
 local v105 = false;
