@@ -5358,12 +5358,12 @@ do
 		if obj then
 			local name = string.lower(tostring(obj.Name or ""))
 			if name == "playagain" or name:find("playagain", 1, true) or name:find("replay", 1, true) then
-				task.defer(v192)
+				task.spawn(v192)
 				return
 			end
 		end
 
-		task.defer(v192)
+		task.spawn(v192)
 	end
 
 	if replayGui then
@@ -5376,7 +5376,7 @@ do
 
 	task.spawn(function()
 		while true do
-			task.wait(0.15)
+			task.wait(0.03)
 			if v32.AutoReplay and not v105 then
 				v192()
 			end
