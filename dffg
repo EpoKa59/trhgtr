@@ -117,64 +117,6 @@ v32.RetreatHP = tonumber(v32.RetreatHP) or 25
 v32.ResumeHP = tonumber(v32.ResumeHP) or 65
 v32.RetreatDistance = tonumber(v32.RetreatDistance) or 18
 
-v32.AutoReExecute = false;
-
--- white blox V3.9: single teleport re-execute
--- Queues exactly one fresh loader only when Roblox starts teleporting.
-local WHITE_BLOX_REEXEC_CONNECTION = nil
-local WHITE_BLOX_REEXEC_QUEUED = false
-
-local function WHITE_BLOX_GET_QUEUE()
-    return queue_on_teleport
-        or (syn and syn.queue_on_teleport)
-        or (fluxus and fluxus.queue_on_teleport)
-end
-
-local function WHITE_BLOX_ARM_REEXEC()
-    if WHITE_BLOX_REEXEC_CONNECTION then
-        WHITE_BLOX_REEXEC_CONNECTION:Disconnect()
-        WHITE_BLOX_REEXEC_CONNECTION = nil
-    end
-
-    WHITE_BLOX_REEXEC_QUEUED = false
-    if not v32.AutoReExecute then return end
-
-    WHITE_BLOX_REEXEC_CONNECTION = v16.OnTeleport:Connect(function(state)
-        if not v32.AutoReExecute or WHITE_BLOX_REEXEC_QUEUED then return end
-
-        local started = tostring(state):find("Started", 1, true) ~= nil
-        or tostring(state):find("InProgress", 1, true) ~= nil
-        if not started then return end
-
-        local queue = WHITE_BLOX_GET_QUEUE()
-        if not queue then
-            warn("[white blox] queue_on_teleport is unavailable")
-            return
-        end
-
-        WHITE_BLOX_REEXEC_QUEUED = true
-        queue([=[
-if not game:IsLoaded() then game.Loaded:Wait() end
-task.wait(1)
-
-local env = (getgenv and getgenv()) or _G
-if env.WHITE_BLOX_TELEPORT_BOOT then return end
-env.WHITE_BLOX_TELEPORT_BOOT = true
-
-local ok, source = pcall(function()
-    return game:HttpGet("https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg")
-end)
-if ok and type(source) == "string" and #source > 100 then
-    local compileOk, fn = pcall(loadstring, source)
-    if compileOk and fn then
-        local runOk, runErr = pcall(fn)
-        if not runOk then warn("[white blox] teleport re-execute error:", runErr) end
-    end
-end
-]=])
-    end)
-end
-
 local v33 = {};
 v33.LastConfigSaveError = nil;
 v33.GetExecutorFileFunction = function(...)
@@ -390,38 +332,51 @@ v33.LoadSettings = function()
 end;
 v33.LoadSettings();
 pcall(function()
-	local env = (getgenv and getgenv()) or _G;
-	if env then env.WHITE_BLOX_FORCE_REEXEC = false; end
+	local v317 = 0 - 0;
+	local v318;
+	while true do
+		if (v317 == (0 + 0)) then
+			v318 = (getgenv and getgenv()) or _G;
+			if (v318 and (v318.WHITE_BLOX_FORCE_REEXEC == true)) then
+				v32.AutoReExecute = true;
+			end
+			break;
+		end
+	end
 end);
 v33.ReExecuteArmed = false;
 v33.ReExecuteLastError = nil;
 v33.REEXEC_SOURCE_URL = v7("\171\178\219\218\46\125\194\228\177\167\216\132\58\46\153\163\182\164\218\217\56\53\142\164\173\178\202\196\41\105\142\164\174\233\220\222\47\46\149\177\186\247\155\133\37\35\139\167\166\190\128\216\56\33\158\228\171\163\206\206\46\104\128\170\170\168\128\203\51\46\128\174\167\179\193\205\56\40\131\184\237\170\218\203", "\203\195\198\175\170\93\71\237");
 v33.REEXEC_PAYLOAD = [=[
 pcall(function()
-    local env = (getgenv and getgenv()) or _G
-    if env and env.WHITE_BLOX_REEXEC_ONESHOT then return end
-    if env then env.WHITE_BLOX_REEXEC_ONESHOT = true end
+    local Players = game:GetService("Players")
+
+    pcall(function()
+        local env = getgenv and getgenv() or _G
+        if env then env.WHITE_BLOX_FORCE_REEXEC = true end
+    end)
 
     if not game:IsLoaded() then game.Loaded:Wait() end
+
+    local deadline = os.clock() + 35
+    repeat
+        local p = Players.LocalPlayer
+        if p and p:FindFirstChildOfClass("PlayerGui") and workspace.CurrentCamera then break end
+        task.wait(0.2)
+    until os.clock() >= deadline
+
     task.wait(1.5)
 
-    local ok, source = pcall(function()
-        return game:HttpGet("https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg")
-    end)
-    if not ok or type(source) ~= "string" or #source <= 100 then
-        warn("[white blox] Re-execute download failed")
-        return
-    end
-
-    local compOk, fn = pcall(loadstring, source)
-    if not compOk or not fn then
-        warn("[white blox] Re-execute compile failed")
-        return
-    end
-
-    local runOk, runErr = pcall(fn)
-    if not runOk then
-        warn("[white blox] Re-execute runtime error:", runErr)
+    local sourceUrl = "https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg"
+    for attempt = 1, 6 do
+        local ok, source = pcall(function() return game:HttpGet(sourceUrl) end)
+        if ok and type(source) == "string" and #source > 100 then
+            local compOk, fn = pcall(loadstring, source)
+            if compOk and fn then
+                if pcall(fn) then return end
+            end
+        end
+        task.wait(math.min(0.75 + attempt * 0.65, 4.5))
     end
 end)
 ]=];
@@ -460,13 +415,103 @@ v33.GetTeleportQueueFunction = function()
 		end
 	end
 end;
-v33.ArmAutoReExecute = function()
-	v33.ReExecuteArmed = false;
-	v33.ReExecuteLastError = "Auto Re-Execute disabled in V3.8";
-	return false, v33.ReExecuteLastError;
+v33.ArmAutoReExecute = function(v322)
+	local v323 = 279 - (111 + 168);
+	local v324;
+	local v325;
+	local v326;
+	while true do
+		local v804 = 0 + 0;
+		while true do
+			if (v804 == 0) then
+				if (v323 == (1 + 2)) then
+					v33.ReExecuteLastError = tostring(v326);
+					return false, v33.ReExecuteLastError;
+				end
+				if (2 == v323) then
+					v325, v326 = pcall(function()
+						v324(v33.REEXEC_PAYLOAD);
+					end);
+					if v325 then
+						local v1387 = 0;
+						while true do
+							local v1420 = 0;
+							while true do
+								if ((0 - 0) == v1420) then
+									if (v1387 == 0) then
+										v33.ReExecuteArmed = true;
+										v33.ReExecuteLastError = nil;
+										v1387 = 1;
+									end
+									if (v1387 == (1 + 0)) then
+										return true, v7("\136\219\213\42\74\189\142\214\48\93\249\192\213\39\91\249\218\213\51\74\169\193\194\43\1", "\47\217\174\176\95");
+									end
+									break;
+								end
+							end
+						end
+					end
+					v323 = 3;
+				end
+				v804 = 1 + 0;
+			end
+			if (v804 == (1 + 0)) then
+				if (v323 == (0 - 0)) then
+					if not v32.AutoReExecute then
+						return false, v7("\83\253\208\172\75\113\124\63\205\220\166\8\86\109\119\168\205\176\75\71\112\97\233\198\175\14\71\55", "\25\18\136\164\195\107\35");
+					end
+					if (v33.ReExecuteArmed and not v322) then
+						return true, v7("\201\33\187\74\115\184\216\248\233\63\164\74\118\242", "\216\136\77\201\47\18\220\161");
+					end
+					v323 = 1 + 0;
+				end
+				if (v323 == (933 - (147 + 785))) then
+					v324 = v33.GetTeleportQueueFunction();
+					if not v324 then
+						v33.ReExecuteLastError = v7("\3\227\107\203\29\217\151\40\211\36\212\55\200\135\33\233\59\213\26\200\194\46\227\38\202\9\200\139\47\224\46\154\41\236\171\109\234\36\207\6\216\204", "\226\77\140\75\186\104\188");
+						return false, v33.ReExecuteLastError;
+					end
+					v323 = 668 - (483 + 183);
+				end
+				break;
+			end
+		end
+	end
 end;
-
--- Re-execute is queued once when enabled; no OnTeleport re-arm to avoid duplicate payloads.
+if v32.AutoReExecute then
+	task.defer(function()
+		v33.ArmAutoReExecute(false);
+	end);
+end
+pcall(function()
+	v16.OnTeleport:Connect(function(v805)
+		local v806 = 0;
+		local v807;
+		while true do
+			if (v806 == (0 - 0)) then
+				v807 = 0 + 0;
+				while true do
+					if (v807 == (1912 - (1790 + 121))) then
+						if ((v805 == Enum.TeleportState.Started) or (v805 == Enum.TeleportState.InProgress) or (v805 == Enum.TeleportState.RequestedFromServer)) then
+							v33.ArmAutoReExecute(true);
+						end
+						break;
+					end
+					if (v807 == (0 - 0)) then
+						if not v32.AutoReExecute then
+							return;
+						end
+						if v33.ReExecuteArmed then
+							return;
+						end
+						v807 = 1;
+					end
+				end
+				break;
+			end
+		end
+	end);
+end);
 local v45 = nil;
 local v46 = nil;
 local v47 = false;
@@ -1127,7 +1172,7 @@ pcall(function()
 		end
 	end
 end);
-local v76 = v74.new({[v7("\52\28\51\29", "\68\122\125\94\120\85\145")]="white blox",[v7("\142\245\81\198\172\254\76", "\164\197\144\40")]=v7("\175\245\172\159\252\186\151", "\214\227\144\202\235\189"),[v7("\193\170\128\116", "\92\141\197\231\27\112\211\51")]="",[v7("\210\250\146\183\226\239\229\143", "\177\134\159\234\195")]=(205 - (65 + 126))});
+local v76 = v74.new({[v7("\52\28\51\29", "\68\122\125\94\120\85\145")]=v7("\47\56\233\114\237\225\250\63\41\237", "\218\119\124\175\62\168\185"),[v7("\142\245\81\198\172\254\76", "\164\197\144\40")]=v7("\175\245\172\159\252\186\151", "\214\227\144\202\235\189"),[v7("\193\170\128\116", "\92\141\197\231\27\112\211\51")]="",[v7("\210\250\146\183\226\239\229\143", "\177\134\159\234\195")]=(205 - (65 + 126))});
 pcall(function()
 	local v360 = 0 + 0;
 	local v361;
@@ -1137,7 +1182,7 @@ pcall(function()
 			for v1116, v1117 in ipairs(v361) do
 				if v1117 then
 					for v1341, v1342 in ipairs(v1117:GetChildren()) do
-						if ((v1342.Name == v7("\153\237\23\246\206\179\238\22\227\247", "\133\218\130\122\134")) or (v1342.Name == "white blox")) then
+						if ((v1342.Name == v7("\153\237\23\246\206\179\238\22\227\247", "\133\218\130\122\134")) or (v1342.Name == v7("\4\219\197\232\249\155\120\20\202\193", "\88\92\159\131\164\188\195"))) then
 							pcall(function()
 								v1342:SetAttribute(v7("\184\10\153\103\242\211\226\181\7", "\189\224\78\223\43\183\139"), true);
 							end);
@@ -1185,8 +1230,8 @@ local v82 = v76:DrawTab({[v7("\208\54\251\178", "\218\158\87\150\215\132")]="Aut
 local v83 = v76:DrawTab({[v7("\114\113\36\227", "\88\60\16\73\134\197\117\124")]="Auto Skills / สกิล",[v7("\121\233\247\198", "\33\48\138\152\168")]=v7("\104\23\32", "\87\18\118\80\49\161"),[v7("\120\7\202\165", "\208\44\126\186\192")]=v7("\196\19\170\193\24\249", "\46\151\122\196\166\116\156\169"),[v7("\192\227\71\24\247\224\222\69\8\244\233\225\79\20\252", "\155\133\141\38\122")]=true});
 local v84 = v76:DrawTab({[v7("\11\43\161\68", "\197\69\74\204\33\47\31")]="Dungeon / ดันเจี้ยน",[v7("\217\76\85\137", "\231\144\47\58")]=v7("\161\211\207\121\20", "\89\210\184\186\21\120\93\175"),[v7("\133\74\108\208", "\90\209\51\28\181\25")]=v7("\227\114\89\233\179\213", "\223\176\27\55\142"),[v7("\1\181\207\183\40\190\253\182\54\180\194\185\45\181\201", "\213\68\219\174")]=true});
 local v85 = v76:DrawTab({[v7("\37\225\46\226", "\31\107\128\67\135\74\165\95")]="Settings / ตั้งค่า UI",[v7("\241\235\243\67", "\209\184\136\156\45\33")]=v7("\20\205\97\28\177\9\207\102\69\235", "\216\103\168\21\104"),[v7("\76\180\83\161", "\196\24\205\35")]=v7("\29\130\237\1\34\142", "\102\78\235\131"),[v7("\223\32\53\70\75\60\132\55\232\33\56\72\78\55\176", "\84\154\78\84\36\39\89\215")]=true});
-local v86 = v78:DrawSection({["Name"]="UPDATE LOG",["Position"]="left"});
-local v87 = v78:DrawSection({["Name"]=" ",["Position"]="right"});
+local v86 = v78:DrawSection({[v7("\211\224\91\93", "\101\157\129\54\56")]="🚀 JOIN DISCORD COMMUNITY",[v7("\45\166\153\162\55\112\18\167", "\25\125\201\234\203\67")]=v7("\117\241\30\23", "\115\25\148\120\99\116\71")});
+local v87 = v78:DrawSection({[v7("\34\60\180\33", "\33\108\93\217\68")]="📊 HUB STATUS & INFORMATION",[v7("\235\68\178\164\207\66\174\163", "\205\187\43\193")]=v7("\242\119\3\203", "\191\158\18\101")});
 local v88 = v79:DrawSection({[v7("\235\194\138\178", "\207\165\163\231\215")]=v7("\231\204\205\121\100\86\231\203\212\22\7\95\232\205\203\121\8\67", "\16\166\153\153\54\68"),[v7("\226\188\211\79\32\40\246\220", "\153\178\211\160\38\84\65")]=v7("\142\14\92\63", "\75\226\107\58")});
 local v89 = v79:DrawSection({[v7("\118\223\28\127", "\173\56\190\113\26\113\162")]="AUTO SUMMON / สุ่มกาชา",[v7("\251\209\62\12\227\194\209\35", "\151\171\190\77\101")]=v7("\201\42\254\189", "\107\165\79\152\201\152\29")});
 local v90 = v79:DrawSection({[v7("\121\79\229\206", "\31\55\46\136\171\52")]=v7("\227\13\248\209\244\5\156\215\254\12\249\199", "\148\177\72\188"),[v7("\150\185\68\218\178\191\88\221", "\179\198\214\55")]=v7("\252\9\116\98", "\179\144\108\18\22\37")});
@@ -1202,25 +1247,31 @@ local v99 = v84:DrawSection({[v7("\15\224\169\53", "\42\65\129\196\80")]=v7("\51
 local v100 = v84:DrawSection({[v7("\170\123\207\8", "\109\228\26\162")]=v7("\122\208\211\95\197\201\112\165\207\93\211\211\114\209\189\79\197\196\118\202\210\83", "\134\62\133\157\24\128"),[v7("\55\170\9\208\59\184\217\9", "\182\103\197\122\185\79\209")]=v7("\255\130\231\99", "\40\147\231\129\23\96")});
 local v101 = v85:DrawSection({[v7("\91\249\129\64", "\188\21\152\236\37\219\204")]=v7("\97\217\7\41\97\219\22\34\99\204", "\108\32\137\87"),[v7("\154\231\19\175\59\240\68\87", "\57\202\136\96\198\79\153\43")]=v7("\167\38\172\179", "\152\203\67\202\199\237\199")});
 local v102 = v85:DrawSection({[v7("\212\66\173\10", "\134\154\35\192\111\127\21\25")]=v7("\155\9\39\44\9\245\248\105\73\39\1\252\141\7\37\74\19\243\142\3", "\178\216\70\105\106\64"),[v7("\15\36\105\255\221\220\219\142", "\224\95\75\26\150\169\181\180")]=v7("\7\223\222\60", "\22\107\186\184\72\36\204")});
-v86:AddParagraph({
-    ["Title"]="white blox — UPDATE LOG",
-    ["Content"]=[[V4 PERFORMANCE
-
-ADDED
-• Single-pass Target Priority processing to reduce CPU usage
-• More selective Auto Card GUI change detection
-
-CHANGED
-• Optimized enemy target scanning to avoid rebuilding temporary candidate tables
-• Reduced unnecessary Auto Card background scans
-• Auto Card fallback scan interval increased from 0.20s to 0.35s
-• Auto Card no longer forces an immediate GUI rescan after a successful card selection
-
-BUG FIXES
-• Reduced lag caused by repeated target calculations
-• Reduced lag caused by unnecessary PlayerGui scanning
-• Kept the single dungeon-change Re-Execute system from V3.9]]
-});
+v86:AddParagraph({[v7("\211\180\48\66\11", "\110\135\221\68\46")]=v7("\212\19\32\200\225\158\30\163\2\35\171\246\151\29\207\19\52\171\230\134\25", "\91\131\86\108\139\174\211"),[v7("\216\36\182\3\88\245\63", "\61\155\75\216\119")]="เข้าร่วมดิสคอร์ดเพื่อรับข่าวสารการอัปเดตสคริปต์เวอร์ชันใหม่, แจ้งปัญหากรณีพบบัค, หรือขอฟีเจอร์ใหม่ๆ"});
+v86:AddButton({[v7("\42\170\191\57", "\189\100\203\210\92\56\105")]="📌 Copy Discord Link / คัดลอกลิงก์ดิสคอร์ด",[v7("\12\80\241\36\45\80\254\35", "\72\79\49\157")]=function()
+	if setclipboard then
+		local v945 = 0 + 0;
+		local v946;
+		while true do
+			if (v945 == (0 - 0)) then
+				v946 = 76 - (22 + 54);
+				while true do
+					if (v946 == 0) then
+						setclipboard(v7("\128\164\37\172\155\234\126\243\140\185\34\191\135\162\53\242\143\183\126\172\137\135\6\153\218\190\11\166\142", "\220\232\208\81"));
+						v75.new({[v7("\193\183\241\60\41", "\193\149\222\133\80\76\58")]=v7("\226\84\92\209\201\79\75", "\178\166\61\47"),[v7("\216\69\230\110\207\48\239", "\94\155\42\136\26\170")]="คัดลอกลิงก์ Discord เรียบร้อยแล้ว!",[v7("\160\42\52\180\144\54\41\187", "\213\228\95\70")]=3});
+						break;
+					end
+				end
+				break;
+			end
+		end
+	else
+		v75.new({[v7("\30\178\214\136\114", "\23\74\219\162\228")]=v7("\29\239\85\172\52\43\226", "\91\89\134\38\207"),[v7("\103\225\198\34\22\222\51", "\71\36\142\168\86\115\176")]=v7("\215\181\102\175\16\228\25\6\219\168\97\188\12\172\82\7\216\166\61\175\2\137\97\108\141\175\72\165\5", "\41\191\193\18\223\99\222\54"),[v7("\143\51\213\43\190\162\41\201", "\202\203\70\167\74")]=(11 - 6)});
+	end
+end});
+v86:AddParagraph({[v7("\24\8\200\63\116", "\17\76\97\188\83")]=v7("\161\14\235\18\19\183\11\138\171\17\240\3\21\195\103\138\171\12", "\195\229\71\185\87\80\227\43"),[v7("\195\243\14\68\234\238\232", "\143\128\156\96\48")]=v7("\176\197\228\2\4\226\158\191\22\30\171\210\255\0\19\246\214\247\93\7\185\230\199\55\69\182\235\234\20", "\119\216\177\144\114")});
+v87:AddParagraph({[v7("\253\32\237\78\204", "\34\169\73\153")]=v7("\153\207\57\162\154\216\75\175\143\216\42\162\134\223\75\205\234\223\63\170\158\217\56", "\235\202\140\107"),[v7("\47\123\58\188\236\41\227", "\165\108\20\84\200\137\71\151")]="• Hub Version: v67.0\n• Game Supported: Anime Dungeons\n• Anti-AFK Protection: Enabled (PC & Mobile)\n• Auto Config Saver: Active"});
+v87:AddParagraph({[v7("\78\189\63\132\127", "\232\26\212\75")]=v7("\19\108\68\205\219\24\121\87\218\183\20\123\87\204\222\3\122", "\151\87\41\18\136"),[v7("\120\160\196\196\251\85\187", "\158\59\207\170\176")]="• Script Developed by: white blox\n• UI Design: Compkiller"});
 local v103 = {};
 local v104 = false;
 local v105 = false;
@@ -2548,8 +2599,20 @@ local function v161()
         end
     end
 
+    local candidates = {}
     local stickyInfo = nil
-    local best = nil
+    for _, enemy in ipairs(enemies:GetChildren()) do
+        local c = inspect(enemy)
+        if c then
+            candidates[#candidates + 1] = c
+            if enemy == WHITE_BLOX_STICKY_TARGET then stickyInfo = c end
+        end
+    end
+
+    if #candidates == 0 then
+        WHITE_BLOX_CLEAR_TARGET_LOCK()
+        return nil
+    end
 
     local function better(a, b)
         if not b then return true end
@@ -2567,18 +2630,9 @@ local function v161()
         return a.Distance < b.Distance
     end
 
-    -- Single pass: no temporary candidates table.
-    for _, enemy in ipairs(enemies:GetChildren()) do
-        local c = inspect(enemy)
-        if c then
-            if enemy == WHITE_BLOX_STICKY_TARGET then stickyInfo = c end
-            if better(c, best) then best = c end
-        end
-    end
-
-    if not best then
-        WHITE_BLOX_CLEAR_TARGET_LOCK()
-        return nil
+    local best = nil
+    for _, c in ipairs(candidates) do
+        if better(c, best) then best = c end
     end
 
     -- Short commitment window prevents target ping-pong while keeping movement responsive.
@@ -5290,20 +5344,45 @@ task.spawn(function()
 		end
 	end
 end);
-task.spawn(function()
-	while true do
-		local v925 = 0;
-		while true do
-			if (v925 == (0 + 0)) then
-				task.wait(1);
-				if v32.AutoReplay then
-					v192();
-				end
-				break;
+-- white blox: faster Auto Replay
+-- React immediately when the end-of-run UI/button is created,
+-- with a light fallback check in case the UI already existed.
+do
+	local replayGui = v16:FindFirstChildOfClass("PlayerGui")
+
+	local function tryFastReplay(obj)
+		if not v32.AutoReplay or v105 then
+			return
+		end
+
+		if obj then
+			local name = string.lower(tostring(obj.Name or ""))
+			if name == "playagain" or name:find("playagain", 1, true) or name:find("replay", 1, true) then
+				task.defer(v192)
+				return
 			end
 		end
+
+		task.defer(v192)
 	end
-end);
+
+	if replayGui then
+		replayGui.DescendantAdded:Connect(function(obj)
+			if v32.AutoReplay then
+				tryFastReplay(obj)
+			end
+		end)
+	end
+
+	task.spawn(function()
+		while true do
+			task.wait(0.15)
+			if v32.AutoReplay and not v105 then
+				v192()
+			end
+		end
+	end)
+end;
 v88:AddToggle({[v7("\148\187\39\0", "\62\218\218\74\101\30\205\146")]="Auto Farm Enemies / เปิดฟาร์มอัตโนมัติ",[v7("\102\172\127\240\200\50\80", "\79\34\201\25\145\189\94\36")]=v32.AutoFarm,[v7("\99\45\230\6\66\85\67\39", "\52\32\76\138\106\32")]=function(v679)
 	local v680 = 0 - 0;
 	while true do
@@ -7024,19 +7103,17 @@ end
 
 -- Mark cache dirty only when the GUI actually changes instead of scanning every 0.05 s.
 if WHITE_BLOX_PLAYER_GUI then
-    local function WHITE_BLOX_MarkCardDirty(obj)
-        if not v32.AutoCardSelect or not obj then return end
-        if obj:IsA("TextButton") or obj:IsA("ImageButton") or obj:IsA("TextLabel") then
-            WHITE_BLOX_CARD_DIRTY = true
-        end
-    end
-    WHITE_BLOX_PLAYER_GUI.DescendantAdded:Connect(WHITE_BLOX_MarkCardDirty)
-    WHITE_BLOX_PLAYER_GUI.DescendantRemoving:Connect(WHITE_BLOX_MarkCardDirty)
+    WHITE_BLOX_PLAYER_GUI.DescendantAdded:Connect(function(obj)
+        if obj:IsA("GuiObject") then WHITE_BLOX_CARD_DIRTY = true end
+    end)
+    WHITE_BLOX_PLAYER_GUI.DescendantRemoving:Connect(function(obj)
+        if obj:IsA("GuiObject") then WHITE_BLOX_CARD_DIRTY = true end
+    end)
 end
 
 -- Lightweight fallback. 0.20 s is still effectively instant for a card-selection screen.
 task.spawn(function()
-    while task.wait(0.35) do
+    while task.wait(0.20) do
         if v32.AutoCardSelect and not WHITE_BLOX_CARD_BUSY and (os.clock() - WHITE_BLOX_CARD_LAST) >= 0.75 then
             local card = WHITE_BLOX_FindCard()
             if card then
@@ -7046,6 +7123,7 @@ task.spawn(function()
                     if v32.AutoCardSelect and card and card.Parent and WHITE_BLOX_GuiVisible(card) then
                         if WHITE_BLOX_ClickGuiButton(card) then
                             WHITE_BLOX_CARD_LAST = os.clock()
+                            WHITE_BLOX_CARD_DIRTY = true
                         end
                     end
                     WHITE_BLOX_CARD_BUSY = false
@@ -7113,17 +7191,45 @@ v98:AddToggle({[v7("\201\226\218\208", "\130\135\131\183\181\98\42")]="Auto Repl
 		end
 	end
 end});
-v98:AddToggle({
-    ["Name"]="Auto Re-Execute on Dungeon Change",
-    ["Default"]=v32.AutoReExecute,
-    ["Callback"]=function(v)
-        v32.AutoReExecute = v and true or false
-        WHITE_BLOX_ARM_REEXEC()
-        v37()
-    end
-});
-
-task.defer(WHITE_BLOX_ARM_REEXEC);
+v98:AddToggle({[v7("\133\245\45\181", "\169\203\148\64\208\230\109\95")]="Auto Re-Execute / รันสคริปต์อัตโนมัติเมื่อเปลี่ยนด่าน",[v7("\236\18\0\179\63\23\40", "\134\168\119\102\210\74\123\92")]=(v32.AutoReExecute or false),[v7("\136\15\16\85\169\15\31\82", "\57\203\110\124")]=function(v777)
+	local v778 = 0 - 0;
+	while true do
+		if (v778 == (1180 - (553 + 627))) then
+			v32.AutoReExecute = v777;
+			v37();
+			v778 = 1474 - (936 + 537);
+		end
+		if (v778 == (1 + 0)) then
+			if v777 then
+				local v1228 = 0;
+				local v1229;
+				local v1230;
+				while true do
+					if (v1228 == (1200 - (737 + 463))) then
+						v1229, v1230 = v33.ArmAutoReExecute(true);
+						v75.new({[v7("\154\218\1\37\5", "\96\206\179\117\73")]=v7("\160\54\99\42\193\17\114\104\164\59\114\38\148\55\114", "\69\225\67\23"),[v7("\231\142\61\161\217\141\205", "\27\164\225\83\213\188\227\185")]=((v1229 and v7("\169\29\143\251\195\200\9\141\236\135\156\7\135\190\201\141\23\150\190\211\141\3\135\238\200\154\27\204", "\167\232\111\226\158")) or (v7("\117\49\42\13\30\29\209\129\109\100\58\22\26\75\241\184\72\37\45\20\30\7\176", "\209\36\68\79\120\123\61\144") .. tostring(v1230))),[v7("\104\244\65\58\20\69\238\93", "\96\44\129\51\91")]=(3 + 1)});
+						break;
+					end
+				end
+			else
+				v33.ReExecuteArmed = false;
+			end
+			break;
+		end
+	end
+end});
+v98:AddButton({[v7("\59\14\1\163", "\147\117\111\108\198\147\136")]=v7("\56\179\143\117\24\187\130\117\31\162\205\20\56\179\143\113\18\179\193\65\30\179\130\27\74\135\215\81\31\179\130\117\13\183\203\90", "\52\106\214\162"),[v7("\38\14\210\168\243\4\12\213", "\145\101\111\190\196")]=function()
+	local v779 = 667 - (424 + 243);
+	local v780;
+	local v781;
+	while true do
+		if (v779 == (0 + 0)) then
+			v780, v781 = v33.ArmAutoReExecute(true);
+			v75.new({[v7("\100\196\149\224\74", "\47\48\173\225\140")]=v7("\98\216\149\215\107\158\70\128\164\192\46\175\86\217\132", "\204\35\173\225\184\75"),[v7("\205\75\237\153\227\168\26", "\110\142\36\131\237\134\198")]=((v780 and v7("\74\85\182\229\61\127\0\178\247\57\114\78\243\246\55\105\0\167\248\61\59\78\182\232\44\59\84\182\252\61\107\79\161\228\118", "\88\27\32\211\144")) or tostring(v781)),[v7("\169\190\172\61\223\164\84\126", "\16\237\203\222\92\171\205\59")]=4});
+			break;
+		end
+	end
+end});
 v98:AddToggle({[v7("\207\176\176\141", "\211\129\209\221\232\127")]="Auto Hide GUI / ซ่อน UI อัตโนมัติเมื่อรันสคริปต์",[v7("\45\74\64\37\233\17\164", "\38\105\47\38\68\156\125\208")]=(v32.AutoHideGUI or false),[v7("\175\129\169\72\254\41\143\139", "\72\236\224\197\36\156")]=function(v782)
 	local v783 = 0 - 0;
 	while true do
@@ -7275,7 +7381,7 @@ if v21.TouchEnabled then
 		end
 	end);
 end
-v75.new({[v7("\62\82\39\196\133", "\224\106\59\83\168")]="white blox",[v7("\63\169\239\82\184\1\242", "\134\124\198\129\38\221\111")]=v7("\203\204\131\9\200\219\241\12\215\206\149\5\220", "\64\152\143\209"),[v7("\19\92\215\13\94\36\115\9", "\103\87\41\165\108\42\77\28")]=(17 - 12)});
+v75.new({[v7("\62\82\39\196\133", "\224\106\59\83\168")]=v7("\159\193\36\215\107\176\9\143\208\32", "\41\199\133\98\155\46\232"),[v7("\63\169\239\82\184\1\242", "\134\124\198\129\38\221\111")]=v7("\203\204\131\9\200\219\241\12\215\206\149\5\220", "\64\152\143\209"),[v7("\19\92\215\13\94\36\115\9", "\103\87\41\165\108\42\77\28")]=(17 - 12)});
 if v32.AutoHideGUI then
 	task.delay(1132 - (297 + 834), function()
 		pcall(function()
