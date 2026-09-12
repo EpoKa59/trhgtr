@@ -5363,8 +5363,30 @@ do
         return out
     end
 
+    local function isEndRunContainer(obj)
+        local cur = obj
+        local depth = 0
+        while cur and cur ~= replayGui and depth < 8 do
+            local n = string.lower(tostring(cur.Name or ""))
+            if n:find("result",1,true)
+                or n:find("reward",1,true)
+                or n:find("victory",1,true)
+                or n:find("complete",1,true)
+                or n:find("finish",1,true)
+                or n:find("end",1,true) then
+                if not cur:IsA("GuiObject") or cur.Visible then
+                    return true
+                end
+            end
+            cur = cur.Parent
+            depth = depth + 1
+        end
+        return false
+    end
+
     local function isReplayButton(obj)
         if not obj or not (obj:IsA("TextButton") or obj:IsA("ImageButton")) then return false end
+        if not isEndRunContainer(obj) then return false end
         local t = replayText(obj)
         return t:find("playagain",1,true) ~= nil
             or t:find("play again",1,true) ~= nil
