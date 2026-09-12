@@ -1204,7 +1204,7 @@ local v101 = v85:DrawSection({[v7("\91\249\129\64", "\188\21\152\236\37\219\204"
 local v102 = v85:DrawSection({[v7("\212\66\173\10", "\134\154\35\192\111\127\21\25")]=v7("\155\9\39\44\9\245\248\105\73\39\1\252\141\7\37\74\19\243\142\3", "\178\216\70\105\106\64"),[v7("\15\36\105\255\221\220\219\142", "\224\95\75\26\150\169\181\180")]=v7("\7\223\222\60", "\22\107\186\184\72\36\204")});
 v86:AddParagraph({
     ["Title"]="white blox — UPDATE LOG",
-    ["Content"]=[[V3.7 STABLE
+    ["Content"]=[[V4 PERFORMANCE
 
 ADDED
 • Auto Card Select: Rewards, Damage, Crit, Health and Time
@@ -1235,7 +1235,9 @@ BUG FIXES
 • Fixed dead mobs remaining sticky
 • Fixed Auto Card GUI scanning lag
 • Fixed INFO update accidentally removing the other tab section declarations
-• Fixed re-execute retrying a partially failing script several times]]
+• Fixed re-execute retrying a partially failing script several times
+• Reduced temporary allocations in Target Priority
+• Reduced Auto Card background GUI work]]
 });
 local v103 = {};
 local v104 = false;
@@ -2564,20 +2566,8 @@ local function v161()
         end
     end
 
-    local candidates = {}
     local stickyInfo = nil
-    for _, enemy in ipairs(enemies:GetChildren()) do
-        local c = inspect(enemy)
-        if c then
-            candidates[#candidates + 1] = c
-            if enemy == WHITE_BLOX_STICKY_TARGET then stickyInfo = c end
-        end
-    end
-
-    if #candidates == 0 then
-        WHITE_BLOX_CLEAR_TARGET_LOCK()
-        return nil
-    end
+    local best = nil
 
     local function better(a, b)
         if not b then return true end
@@ -2595,9 +2585,18 @@ local function v161()
         return a.Distance < b.Distance
     end
 
-    local best = nil
-    for _, c in ipairs(candidates) do
-        if better(c, best) then best = c end
+    -- Single pass: no temporary candidates table.
+    for _, enemy in ipairs(enemies:GetChildren()) do
+        local c = inspect(enemy)
+        if c then
+            if enemy == WHITE_BLOX_STICKY_TARGET then stickyInfo = c end
+            if better(c, best) then best = c end
+        end
+    end
+
+    if not best then
+        WHITE_BLOX_CLEAR_TARGET_LOCK()
+        return nil
     end
 
     -- Short commitment window prevents target ping-pong while keeping movement responsive.
@@ -7043,17 +7042,19 @@ end
 
 -- Mark cache dirty only when the GUI actually changes instead of scanning every 0.05 s.
 if WHITE_BLOX_PLAYER_GUI then
-    WHITE_BLOX_PLAYER_GUI.DescendantAdded:Connect(function(obj)
-        if obj:IsA("GuiObject") then WHITE_BLOX_CARD_DIRTY = true end
-    end)
-    WHITE_BLOX_PLAYER_GUI.DescendantRemoving:Connect(function(obj)
-        if obj:IsA("GuiObject") then WHITE_BLOX_CARD_DIRTY = true end
-    end)
+    local function WHITE_BLOX_MarkCardDirty(obj)
+        if not v32.AutoCardSelect or not obj then return end
+        if obj:IsA("TextButton") or obj:IsA("ImageButton") or obj:IsA("TextLabel") then
+            WHITE_BLOX_CARD_DIRTY = true
+        end
+    end
+    WHITE_BLOX_PLAYER_GUI.DescendantAdded:Connect(WHITE_BLOX_MarkCardDirty)
+    WHITE_BLOX_PLAYER_GUI.DescendantRemoving:Connect(WHITE_BLOX_MarkCardDirty)
 end
 
 -- Lightweight fallback. 0.20 s is still effectively instant for a card-selection screen.
 task.spawn(function()
-    while task.wait(0.20) do
+    while task.wait(0.35) do
         if v32.AutoCardSelect and not WHITE_BLOX_CARD_BUSY and (os.clock() - WHITE_BLOX_CARD_LAST) >= 0.75 then
             local card = WHITE_BLOX_FindCard()
             if card then
@@ -7063,7 +7064,6 @@ task.spawn(function()
                     if v32.AutoCardSelect and card and card.Parent and WHITE_BLOX_GuiVisible(card) then
                         if WHITE_BLOX_ClickGuiButton(card) then
                             WHITE_BLOX_CARD_LAST = os.clock()
-                            WHITE_BLOX_CARD_DIRTY = true
                         end
                     end
                     WHITE_BLOX_CARD_BUSY = false
