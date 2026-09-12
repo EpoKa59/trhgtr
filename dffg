@@ -7318,15 +7318,19 @@ local function WHITE_BLOX_UPDATE_CUSTOM_CARD_ORDER()
 end
 
 local function WHITE_BLOX_ADD_PRIORITY_DROPDOWN(number, key)
+    -- CompKiller dropdown format used by the working dropdowns in this script.
+    -- Keep Values inline so the UI receives the actual choices at creation time.
     v98:AddDropdown({
-        ["Name"]="Priority " .. tostring(number),
-        ["Default"]=v32[key],
-        ["Values"]=WHITE_BLOX_CARD_TYPES,
-        ["Multi"]=false,
-        ["Callback"]=function(v)
-            local selected = ((type(v) == "table") and (v[1] or next(v))) or v
-            v32[key] = tostring(selected)
-            WHITE_BLOX_UPDATE_CUSTOM_CARD_ORDER()
+        ["Name"] = "Priority " .. tostring(number),
+        ["Default"] = tostring(v32[key]),
+        ["Values"] = {"Rewards", "Damage", "Crit", "Health", "Time"},
+        ["Multi"] = false,
+        ["Callback"] = function(value)
+            local selected = (type(value) == "table" and (value[1] or next(value))) or value
+            if selected then
+                v32[key] = tostring(selected)
+                WHITE_BLOX_UPDATE_CUSTOM_CARD_ORDER()
+            end
         end
     })
 end
