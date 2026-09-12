@@ -5417,6 +5417,15 @@ do
         end
         WHITE_BLOX_REPLAY_DEBUG("realClick appelé")
 
+        -- Reproduce the successful V3.8 behavior: activate the exact GUI button
+        -- AND send a real pointer click, instead of relying on only one mechanism.
+        pcall(function()
+            if firesignal then
+                firesignal(button.Activated)
+                firesignal(button.MouseButton1Click)
+            end
+        end)
+
         local size = button.AbsoluteSize
         local pos = button.AbsolutePosition
         if size.X <= 0 or size.Y <= 0 then return false end
@@ -5453,18 +5462,18 @@ do
             end)
         end
 
-        -- Fallback to VirtualInputManager if the executor has no mouse primitives.
-        if not ok then
-            WHITE_BLOX_REPLAY_DEBUG("Méthode: VirtualInputManager")
-            ok = pcall(function()
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendMouseMoveEvent(x, y, game)
-                task.wait(0.03)
-                vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
-                task.wait(0.05)
-                vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
-            end)
-        end
+        -- Also send VirtualInputManager input. V3.8 combined GUI activation
+        -- with a pointer click, which is the version that actually replayed.
+        WHITE_BLOX_REPLAY_DEBUG("Méthode complémentaire: VirtualInputManager")
+        local vimOk = pcall(function()
+            local vim = game:GetService("VirtualInputManager")
+            vim:SendMouseMoveEvent(x, y, game)
+            task.wait(0.03)
+            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            task.wait(0.05)
+            vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        end)
+        ok = ok or vimOk
 
         if not ok then
             WHITE_BLOX_REPLAY_DEBUG("ÉCHEC envoi du clic")
