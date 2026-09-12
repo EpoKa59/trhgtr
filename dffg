@@ -5344,14 +5344,22 @@ task.spawn(function()
 		end
 	end
 end);
--- white blox: Auto Replay V4.3
--- One real click only when a visible end/results screen contains Play Again.
+-- white blox: Auto Replay V4.5 - exact PlayAgain only
 do
     local replayGui = v16:FindFirstChildOfClass("PlayerGui")
-    local replayLocked = false
-    local replayQueued = false
+    local handled = false
+    local watchedButton = nil
+    local watchedConnections = {}
 
-    local function isActuallyVisible(obj)
+    local function clearWatch()
+        for _, c in ipairs(watchedConnections) do
+            pcall(function() c:Disconnect() end)
+        end
+        watchedConnections = {}
+        watchedButton = nil
+    end
+
+    local function visibleThroughParents(obj)
         local cur = obj
         while cur and cur ~= replayGui do
             if cur:IsA("GuiObject") and not cur.Visible then return false end
@@ -5361,121 +5369,124 @@ do
         return true
     end
 
-    local function buttonText(button)
-        local parts = {string.lower(tostring(button.Name or ""))}
-        if button:IsA("TextButton") then
-            parts[#parts + 1] = string.lower(tostring(button.Text or ""))
-        end
-        for _, d in ipairs(button:GetDescendants()) do
-            if d:IsA("TextLabel") or d:IsA("TextButton") then
-                parts[#parts + 1] = string.lower(tostring(d.Text or ""))
-            end
-        end
-        return table.concat(parts, " ")
+    local function exactPlayAgain()
+        if not replayGui then return nil end
+
+        -- Exact hierarchy confirmed in Explorer:
+        -- PlayerGui > Main > DungeonFrame > DungeonStats > EndActions > PlayAgain
+        local main = replayGui:FindFirstChild("Main")
+        local dungeonFrame = main and main:FindFirstChild("DungeonFrame")
+        local dungeonStats = dungeonFrame and dungeonFrame:FindFirstChild("DungeonStats")
+        local endActions = dungeonStats and dungeonStats:FindFirstChild("EndActions")
+        local playAgain = endActions and endActions:FindFirstChild("PlayAgain")
+        return playAgain
     end
 
-    local function isReplayButton(button)
-        if not button or not (button:IsA("TextButton") or button:IsA("ImageButton")) then return false end
-        if not isActuallyVisible(button) then return false end
-        local t = buttonText(button)
-        return t:find("play again", 1, true) ~= nil
-            or t:find("playagain", 1, true) ~= nil
-            or t:find("replay", 1, true) ~= nil
-    end
+    local function realClick(button)
+        if handled or not v32.AutoReplay or not button or not button.Parent then return false end
+        if not visibleThroughParents(button) then return false end
 
-    local function clickOnce(button)
-        if replayLocked or not v32.AutoReplay or not isReplayButton(button) then return end
         local size = button.AbsoluteSize
-        if size.X <= 0 or size.Y <= 0 then return end
+        if size.X <= 0 or size.Y <= 0 then return false end
 
-        replayLocked = true
         local pos = button.AbsolutePosition
-        pcall(function()
+        local x = pos.X + size.X * 0.5
+        local y = pos.Y + size.Y * 0.5
+
+        local ok = pcall(function()
             local vim = game:GetService("VirtualInputManager")
-            local x = pos.X + size.X * 0.5
-            local y = pos.Y + size.Y * 0.5
+            vim:SendMouseMoveEvent(x, y, game)
             vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            task.wait()
             vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
         end)
 
-        -- Keep the lock while this results UI remains on screen.
-        task.spawn(function()
-            while button.Parent and isActuallyVisible(button) do
-                task.wait(0.10)
-            end
-            replayLocked = false
-        end)
+        if ok then
+            handled = true
+            return true
+        end
+        return false
     end
 
-    local function findExactPlayAgain()
-        if not replayGui then return nil end
-        for _, dungeonFrame in ipairs(replayGui:GetDescendants()) do
-            if dungeonFrame.Name == "DungeonFrame" then
-                local stats = dungeonFrame:FindFirstChild("DungeonStats")
-                local actions = stats and stats:FindFirstChild("EndActions")
-                local playAgain = actions and actions:FindFirstChild("PlayAgain")
-                if playAgain and (playAgain:IsA("TextButton") or playAgain:IsA("ImageButton")) then
-                    return playAgain
-                end
-            end
+    local function tryClick()
+        if not v32.AutoReplay or handled then return end
+        local button = exactPlayAgain()
+        if button then
+            realClick(button)
         end
-        return nil
     end
 
-    local function scanVisibleReplay()
-        if replayLocked or not v32.AutoReplay or not replayGui then return end
+    local function watchButton(button)
+        if watchedButton == button then return end
+        clearWatch()
+        watchedButton = button
 
-        -- Exact game hierarchy first: DungeonFrame > DungeonStats > EndActions > PlayAgain
-        local exact = findExactPlayAgain()
-        if exact and isActuallyVisible(exact) then
-            clickOnce(exact)
-            return
-        end
-
-        -- Generic fallback in case the UI hierarchy changes later.
-        for _, obj in ipairs(replayGui:GetDescendants()) do
-            if isReplayButton(obj) then
-                clickOnce(obj)
+        local function changed()
+            if not button.Parent then
+                handled = false
+                clearWatch()
                 return
             end
+
+            if visibleThroughParents(button) then
+                task.defer(tryClick)
+            else
+                -- End screen closed: arm Auto Replay for the next run.
+                handled = false
+            end
         end
+
+        if button:IsA("GuiObject") then
+            watchedConnections[#watchedConnections + 1] =
+                button:GetPropertyChangedSignal("Visible"):Connect(changed)
+            watchedConnections[#watchedConnections + 1] =
+                button:GetPropertyChangedSignal("AbsoluteSize"):Connect(changed)
+        end
+
+        local cur = button.Parent
+        while cur and cur ~= replayGui do
+            if cur:IsA("GuiObject") then
+                watchedConnections[#watchedConnections + 1] =
+                    cur:GetPropertyChangedSignal("Visible"):Connect(changed)
+            elseif cur:IsA("ScreenGui") then
+                watchedConnections[#watchedConnections + 1] =
+                    cur:GetPropertyChangedSignal("Enabled"):Connect(changed)
+            end
+            cur = cur.Parent
+        end
+
+        watchedConnections[#watchedConnections + 1] =
+            button.AncestryChanged:Connect(changed)
+
+        changed()
     end
 
-    local function queueScan()
-        if replayQueued or replayLocked or not v32.AutoReplay then return end
-        replayQueued = true
-        task.defer(function()
-            replayQueued = false
-            scanVisibleReplay()
-        end)
-    end
-
-    local function watch(obj)
-        if obj:IsA("GuiObject") then
-            obj:GetPropertyChangedSignal("Visible"):Connect(function()
-                if obj.Visible then queueScan() end
-            end)
-        elseif obj:IsA("ScreenGui") then
-            obj:GetPropertyChangedSignal("Enabled"):Connect(function()
-                if obj.Enabled then queueScan() end
-            end)
+    local function refreshExactButton()
+        if not replayGui then return end
+        local button = exactPlayAgain()
+        if button then
+            watchButton(button)
         end
     end
 
     if replayGui then
-        for _, obj in ipairs(replayGui:GetDescendants()) do
-            watch(obj)
-        end
+        refreshExactButton()
+
+        -- Only react when this exact object/hierarchy appears.
         replayGui.DescendantAdded:Connect(function(obj)
-            watch(obj)
-            if obj.Name == "PlayAgain" then
-                task.defer(function()
-                    if v32.AutoReplay and isActuallyVisible(obj) then
-                        clickOnce(obj)
-                    end
-                end)
-            else
-                queueScan()
+            if obj.Name == "PlayAgain"
+                or obj.Name == "EndActions"
+                or obj.Name == "DungeonStats"
+                or obj.Name == "DungeonFrame"
+                or obj.Name == "Main" then
+                task.defer(refreshExactButton)
+            end
+        end)
+
+        replayGui.DescendantRemoving:Connect(function(obj)
+            if obj == watchedButton then
+                handled = false
+                clearWatch()
             end
         end)
     end
