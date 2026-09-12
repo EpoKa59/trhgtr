@@ -117,6 +117,64 @@ v32.RetreatHP = tonumber(v32.RetreatHP) or 25
 v32.ResumeHP = tonumber(v32.ResumeHP) or 65
 v32.RetreatDistance = tonumber(v32.RetreatDistance) or 18
 
+v32.AutoReExecute = false;
+
+-- white blox V3.9: single teleport re-execute
+-- Queues exactly one fresh loader only when Roblox starts teleporting.
+local WHITE_BLOX_REEXEC_CONNECTION = nil
+local WHITE_BLOX_REEXEC_QUEUED = false
+
+local function WHITE_BLOX_GET_QUEUE()
+    return queue_on_teleport
+        or (syn and syn.queue_on_teleport)
+        or (fluxus and fluxus.queue_on_teleport)
+end
+
+local function WHITE_BLOX_ARM_REEXEC()
+    if WHITE_BLOX_REEXEC_CONNECTION then
+        WHITE_BLOX_REEXEC_CONNECTION:Disconnect()
+        WHITE_BLOX_REEXEC_CONNECTION = nil
+    end
+
+    WHITE_BLOX_REEXEC_QUEUED = false
+    if not v32.AutoReExecute then return end
+
+    WHITE_BLOX_REEXEC_CONNECTION = v16.OnTeleport:Connect(function(state)
+        if not v32.AutoReExecute or WHITE_BLOX_REEXEC_QUEUED then return end
+
+        local started = tostring(state):find("Started", 1, true) ~= nil
+        or tostring(state):find("InProgress", 1, true) ~= nil
+        if not started then return end
+
+        local queue = WHITE_BLOX_GET_QUEUE()
+        if not queue then
+            warn("[white blox] queue_on_teleport is unavailable")
+            return
+        end
+
+        WHITE_BLOX_REEXEC_QUEUED = true
+        queue([=[
+if not game:IsLoaded() then game.Loaded:Wait() end
+task.wait(1)
+
+local env = (getgenv and getgenv()) or _G
+if env.WHITE_BLOX_TELEPORT_BOOT then return end
+env.WHITE_BLOX_TELEPORT_BOOT = true
+
+local ok, source = pcall(function()
+    return game:HttpGet("https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg")
+end)
+if ok and type(source) == "string" and #source > 100 then
+    local compileOk, fn = pcall(loadstring, source)
+    if compileOk and fn then
+        local runOk, runErr = pcall(fn)
+        if not runOk then warn("[white blox] teleport re-execute error:", runErr) end
+    end
+end
+]=])
+    end)
+end
+
 local v33 = {};
 v33.LastConfigSaveError = nil;
 v33.GetExecutorFileFunction = function(...)
@@ -402,74 +460,12 @@ v33.GetTeleportQueueFunction = function()
 		end
 	end
 end;
-v33.ArmAutoReExecute = function(v322)
-	local v323 = 279 - (111 + 168);
-	local v324;
-	local v325;
-	local v326;
-	while true do
-		local v804 = 0 + 0;
-		while true do
-			if (v804 == 0) then
-				if (v323 == (1 + 2)) then
-					v33.ReExecuteLastError = tostring(v326);
-					return false, v33.ReExecuteLastError;
-				end
-				if (2 == v323) then
-					v325, v326 = pcall(function()
-						v324(v33.REEXEC_PAYLOAD);
-					end);
-					if v325 then
-						local v1387 = 0;
-						while true do
-							local v1420 = 0;
-							while true do
-								if ((0 - 0) == v1420) then
-									if (v1387 == 0) then
-										v33.ReExecuteArmed = true;
-										v33.ReExecuteLastError = nil;
-										v1387 = 1;
-									end
-									if (v1387 == (1 + 0)) then
-										return true, v7("\136\219\213\42\74\189\142\214\48\93\249\192\213\39\91\249\218\213\51\74\169\193\194\43\1", "\47\217\174\176\95");
-									end
-									break;
-								end
-							end
-						end
-					end
-					v323 = 3;
-				end
-				v804 = 1 + 0;
-			end
-			if (v804 == (1 + 0)) then
-				if (v323 == (0 - 0)) then
-					if not v32.AutoReExecute then
-						return false, v7("\83\253\208\172\75\113\124\63\205\220\166\8\86\109\119\168\205\176\75\71\112\97\233\198\175\14\71\55", "\25\18\136\164\195\107\35");
-					end
-					if (v33.ReExecuteArmed and not v322) then
-						return true, v7("\201\33\187\74\115\184\216\248\233\63\164\74\118\242", "\216\136\77\201\47\18\220\161");
-					end
-					v323 = 1 + 0;
-				end
-				if (v323 == (933 - (147 + 785))) then
-					v324 = v33.GetTeleportQueueFunction();
-					if not v324 then
-						v33.ReExecuteLastError = v7("\3\227\107\203\29\217\151\40\211\36\212\55\200\135\33\233\59\213\26\200\194\46\227\38\202\9\200\139\47\224\46\154\41\236\171\109\234\36\207\6\216\204", "\226\77\140\75\186\104\188");
-						return false, v33.ReExecuteLastError;
-					end
-					v323 = 668 - (483 + 183);
-				end
-				break;
-			end
-		end
-	end
+v33.ArmAutoReExecute = function()
+	v33.ReExecuteArmed = false;
+	v33.ReExecuteLastError = "Auto Re-Execute disabled in V3.8";
+	return false, v33.ReExecuteLastError;
 end;
-if v32.AutoReExecute then
-	task.defer(function()
-		v33.ArmAutoReExecute(false);
-	end);
-end
+
 -- Re-execute is queued once when enabled; no OnTeleport re-arm to avoid duplicate payloads.
 local v45 = nil;
 local v46 = nil;
@@ -7135,45 +7131,17 @@ v98:AddToggle({[v7("\201\226\218\208", "\130\135\131\183\181\98\42")]="Auto Repl
 		end
 	end
 end});
-v98:AddToggle({[v7("\133\245\45\181", "\169\203\148\64\208\230\109\95")]="Auto Re-Execute / รันสคริปต์อัตโนมัติเมื่อเปลี่ยนด่าน",[v7("\236\18\0\179\63\23\40", "\134\168\119\102\210\74\123\92")]=(v32.AutoReExecute or false),[v7("\136\15\16\85\169\15\31\82", "\57\203\110\124")]=function(v777)
-	local v778 = 0 - 0;
-	while true do
-		if (v778 == (1180 - (553 + 627))) then
-			v32.AutoReExecute = v777;
-			v37();
-			v778 = 1474 - (936 + 537);
-		end
-		if (v778 == (1 + 0)) then
-			if v777 then
-				local v1228 = 0;
-				local v1229;
-				local v1230;
-				while true do
-					if (v1228 == (1200 - (737 + 463))) then
-						v1229, v1230 = v33.ArmAutoReExecute(true);
-						v75.new({[v7("\154\218\1\37\5", "\96\206\179\117\73")]=v7("\160\54\99\42\193\17\114\104\164\59\114\38\148\55\114", "\69\225\67\23"),[v7("\231\142\61\161\217\141\205", "\27\164\225\83\213\188\227\185")]=((v1229 and v7("\169\29\143\251\195\200\9\141\236\135\156\7\135\190\201\141\23\150\190\211\141\3\135\238\200\154\27\204", "\167\232\111\226\158")) or (v7("\117\49\42\13\30\29\209\129\109\100\58\22\26\75\241\184\72\37\45\20\30\7\176", "\209\36\68\79\120\123\61\144") .. tostring(v1230))),[v7("\104\244\65\58\20\69\238\93", "\96\44\129\51\91")]=(3 + 1)});
-						break;
-					end
-				end
-			else
-				v33.ReExecuteArmed = false;
-			end
-			break;
-		end
-	end
-end});
-v98:AddButton({[v7("\59\14\1\163", "\147\117\111\108\198\147\136")]=v7("\56\179\143\117\24\187\130\117\31\162\205\20\56\179\143\113\18\179\193\65\30\179\130\27\74\135\215\81\31\179\130\117\13\183\203\90", "\52\106\214\162"),[v7("\38\14\210\168\243\4\12\213", "\145\101\111\190\196")]=function()
-	local v779 = 667 - (424 + 243);
-	local v780;
-	local v781;
-	while true do
-		if (v779 == (0 + 0)) then
-			v780, v781 = v33.ArmAutoReExecute(true);
-			v75.new({[v7("\100\196\149\224\74", "\47\48\173\225\140")]=v7("\98\216\149\215\107\158\70\128\164\192\46\175\86\217\132", "\204\35\173\225\184\75"),[v7("\205\75\237\153\227\168\26", "\110\142\36\131\237\134\198")]=((v780 and v7("\74\85\182\229\61\127\0\178\247\57\114\78\243\246\55\105\0\167\248\61\59\78\182\232\44\59\84\182\252\61\107\79\161\228\118", "\88\27\32\211\144")) or tostring(v781)),[v7("\169\190\172\61\223\164\84\126", "\16\237\203\222\92\171\205\59")]=4});
-			break;
-		end
-	end
-end});
+v98:AddToggle({
+    ["Name"]="Auto Re-Execute on Dungeon Change",
+    ["Default"]=v32.AutoReExecute,
+    ["Callback"]=function(v)
+        v32.AutoReExecute = v and true or false
+        WHITE_BLOX_ARM_REEXEC()
+        v37()
+    end
+});
+
+task.defer(WHITE_BLOX_ARM_REEXEC);
 v98:AddToggle({[v7("\207\176\176\141", "\211\129\209\221\232\127")]="Auto Hide GUI / ซ่อน UI อัตโนมัติเมื่อรันสคริปต์",[v7("\45\74\64\37\233\17\164", "\38\105\47\38\68\156\125\208")]=(v32.AutoHideGUI or false),[v7("\175\129\169\72\254\41\143\139", "\72\236\224\197\36\156")]=function(v782)
 	local v783 = 0 - 0;
 	while true do
