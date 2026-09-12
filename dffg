@@ -3807,92 +3807,55 @@ local function v204()
 	end
 end
 local function v205(v587, v588, v589)
+	-- White Blox V6.7: AutoFarm movement is 100% controlled by TweenSpeed.
+	-- No instant CFrame reposition and no special long-distance movement branch.
 	if WHITE_BLOX_DODGING then
 		v204();
 		return;
 	end
-	local v590 = 0 - 0;
-	local v591;
-	local v592;
-	local v593;
-	local v594;
-	local v595;
-	local v596;
-	local v597;
-	while true do
-		if (v590 == (11 - 8)) then
-			v597 = not v203 or ((v203 - v591).Magnitude > (2.5 - 0));
-			if (not v201 or v596 or v597) then
-				v204();
-				local v1200 = math.clamp(tonumber(v32.TweenSpeed) or 75, 40, 820 - (128 + 542));
-				local v1201 = math.max(v594 / v1200, 0.05 - 0);
-				v202 = v588;
-				v203 = v591;
-				v201 = v23:Create(v587, TweenInfo.new(v1201, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {[v7("\252\249\18\164\210\218", "\197\191\191\96")]=v595});
-				v201.Completed:Connect(function()
-					if (v201 and (v201.PlaybackState == Enum.PlaybackState.Completed)) then
-						v201 = nil;
-					end
-				end);
-				v201:Play();
+	if not v587 or not v587.Parent or not v588 or not v588.Parent or not v589 then
+		v204();
+		return;
+	end
+
+	local destination = v589.Position;
+	local currentPosition = v587.Position;
+	local distance = (destination - currentPosition).Magnitude;
+
+	if distance <= 1 then
+		v204();
+		return;
+	end
+
+	local targetCFrame = v194(destination, v588);
+	local targetChanged = v202 ~= v588;
+	local destinationChanged = not v203 or ((v203 - destination).Magnitude > 2.5);
+
+	if not v201 or targetChanged or destinationChanged then
+		v204();
+
+		-- The slider is now the single movement-speed source for AutoFarm.
+		local tweenSpeed = math.clamp(tonumber(v32.TweenSpeed) or 75, 40, 150);
+		local duration = math.max(distance / tweenSpeed, 0.05);
+
+		v202 = v588;
+		v203 = destination;
+		v201 = v23:Create(
+			v587,
+			TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+			{CFrame = targetCFrame}
+		);
+
+		local thisTween = v201;
+		thisTween.Completed:Connect(function()
+			if v201 == thisTween then
+				v201 = nil;
 			end
-			break;
-		end
-		if (v590 == 1) then
-			v593 = v591 - v592;
-			v594 = v593.Magnitude;
-			if (v594 > v11) then
-				local v1202 = 0;
-				local v1203;
-				while true do
-					if (v1202 == (3 - 2)) then
-						-- White Blox V6.6: instant AutoFarm CFrame jump removed; Tween movement continues.
-						v587.AssemblyLinearVelocity = Vector3.zero;
-						v1202 = 2;
-					end
-					if (v1202 == 4) then
-						v594 = v593.Magnitude;
-						break;
-					end
-					if (v1202 == (6 - 4)) then
-						v587.AssemblyAngularVelocity = Vector3.zero;
-						task.wait(0.03 + 0);
-						v1202 = 3;
-					end
-					if (v1202 == (0 - 0)) then
-						v204();
-						v1203 = v591 - (v593.Unit * v12);
-						v1202 = 1 + 0;
-					end
-					if (v1202 == 3) then
-						v592 = v587.Position;
-						v593 = v591 - v592;
-						v1202 = 4;
-					end
-				end
-			end
-			v590 = 2 + 0;
-		end
-		if (v590 == (3 - 1)) then
-			if (v594 <= (1 + 0)) then
-				v204();
-				return;
-			end
-			v595 = v194(v591, v588);
-			v596 = v202 ~= v588;
-			v590 = 815 - (96 + 716);
-		end
-		if (v590 == (1607 - (85 + 1522))) then
-			if (not v587 or not v587.Parent or not v588 or not v588.Parent) then
-				v204();
-				return;
-			end
-			v591 = v589.Position;
-			v592 = v587.Position;
-			v590 = 854 - (724 + 129);
-		end
+		end);
+		thisTween:Play();
 	end
 end
+
 -- Generic animation-aware auto dodge.
 -- It reacts only to Action-priority animations from the current target and
 -- briefly pauses the farm tween so the sidestep is not instantly cancelled.
