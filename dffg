@@ -107,7 +107,7 @@ v32.DodgeTriggerDistance = tonumber(v32.DodgeTriggerDistance) or 18
 v32.DodgeDistance = tonumber(v32.DodgeDistance) or 10
 v32.DodgeCooldown = tonumber(v32.DodgeCooldown) or 0.85
 v32.TargetMaxDistance = tonumber(v32.TargetMaxDistance) or 0
-v32.TargetStickTime = tonumber(v32.TargetStickTime) or 1.25
+v32.TargetStickTime = tonumber(v32.TargetStickTime) or 0.35
 v32.TargetBossWeight = tonumber(v32.TargetBossWeight) or 250
 v32.SmartSkills = v32.SmartSkills or false
 v32.SkillMinHPPercent = tonumber(v32.SkillMinHPPercent) or 25
@@ -2517,67 +2517,128 @@ local function v160(v483)
 end
 local WHITE_BLOX_STICKY_TARGET = nil
 local WHITE_BLOX_STICKY_UNTIL = 0
+local WHITE_BLOX_LAST_TARGET_MODE = nil
+local WHITE_BLOX_LAST_TARGET_NAME = nil
+
+local function WHITE_BLOX_CLEAR_TARGET_LOCK()
+    WHITE_BLOX_STICKY_TARGET = nil
+    WHITE_BLOX_STICKY_UNTIL = 0
+    v156 = nil
+    v157 = 0
+end
+
 local function v161()
     local enemies = v159()
     if not enemies then return nil end
+
     local character = v16.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return nil end
 
     local mode = tostring(v32.TargetMode or "Nearest")
     local wantedName = string.lower(tostring(v32.TargetName or ""))
-    local maxDistance = tonumber(v32.TargetMaxDistance) or 0
-    local bossWeight = tonumber(v32.TargetBossWeight) or 250
+    local maxDistance = math.max(0, tonumber(v32.TargetMaxDistance) or 0)
+
+    if WHITE_BLOX_LAST_TARGET_MODE ~= mode or WHITE_BLOX_LAST_TARGET_NAME ~= wantedName then
+        WHITE_BLOX_CLEAR_TARGET_LOCK()
+        WHITE_BLOX_LAST_TARGET_MODE = mode
+        WHITE_BLOX_LAST_TARGET_NAME = wantedName
+    end
 
     local function isBoss(model)
-        if model:GetAttribute("Boss") == true or model:GetAttribute("IsBoss") == true then return true end
+        if model:GetAttribute("Boss") == true or model:GetAttribute("IsBoss") == true or model:GetAttribute("Elite") == true then
+            return true
+        end
         local n = string.lower(model.Name)
-        return n:find("boss",1,true) or n:find("lord",1,true) or n:find("king",1,true) or n:find("elite",1,true)
-    end
-    local function getPart(enemy)
-        return enemy:FindFirstChild("HumanoidRootPart") or enemy.PrimaryPart or enemy:FindFirstChild("Torso") or enemy:FindFirstChild("UpperTorso") or enemy:FindFirstChildWhichIsA("BasePart")
-    end
-    local function valid(enemy)
-        if not enemy or not enemy.Parent or string.find(string.lower(enemy.Name), "dummy", 1, true) then return false end
-        local hum=enemy:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health <= 0 then return false end
-        local part=getPart(enemy); if not part then return false end
-        local dist=(part.Position-root.Position).Magnitude
-        if maxDistance > 0 and dist > maxDistance then return false end
-        if mode=="Specific Name" and (wantedName=="" or not string.find(string.lower(enemy.Name),wantedName,1,true)) then return false end
-        return true, hum, part, dist
+        return n:find("boss",1,true) ~= nil
+            or n:find("lord",1,true) ~= nil
+            or n:find("king",1,true) ~= nil
+            or n:find("elite",1,true) ~= nil
     end
 
-    -- Sticky targeting prevents rapid target switching while several enemies overlap.
-    if WHITE_BLOX_STICKY_TARGET and os.clock() < WHITE_BLOX_STICKY_UNTIL then
-        local ok,_,part=valid(WHITE_BLOX_STICKY_TARGET)
-        if ok then return {Model=WHITE_BLOX_STICKY_TARGET,Part=part} end
+    local function inspect(enemy)
+        if not enemy or not enemy.Parent then return nil end
+        if string.find(string.lower(enemy.Name), "dummy", 1, true) then return nil end
+
+        local hum = enemy:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health <= 0 then return nil end
+
+        local part = enemy:FindFirstChild("HumanoidRootPart")
+            or enemy.PrimaryPart
+            or enemy:FindFirstChild("Torso")
+            or enemy:FindFirstChild("UpperTorso")
+            or enemy:FindFirstChildWhichIsA("BasePart")
+        if not part then return nil end
+
+        local dist = (part.Position - root.Position).Magnitude
+        if maxDistance > 0 and dist > maxDistance then return nil end
+
+        if mode == "Specific Name" and
+           (wantedName == "" or not string.find(string.lower(enemy.Name), wantedName, 1, true)) then
+            return nil
+        end
+
+        local hp = hum and hum.Health or math.huge
+        local maxhp = hum and math.max(hum.MaxHealth, 1) or math.huge
+        return {
+            Model=enemy, Part=part, Humanoid=hum,
+            Distance=dist, HP=hp, MaxHP=maxhp,
+            HPPct=(hum and maxhp < math.huge) and (hp/maxhp) or 1,
+            Boss=isBoss(enemy)
+        }
     end
 
-    local bestModel,bestPart,bestScore=nil,nil,math.huge
-    for _,enemy in ipairs(enemies:GetChildren()) do
-        local ok,hum,part,dist=valid(enemy)
-        if ok then
-            local hp=hum and hum.Health or 1e9
-            local maxhp=hum and math.max(hum.MaxHealth,1) or hp
-            local hpPct=hp/maxhp
-            local score=dist
-            if mode=="Lowest HP" then score=hp
-            elseif mode=="Highest HP" then score=-hp
-            elseif mode=="Boss First" then score=(isBoss(enemy) and -bossWeight or 0)+dist
-            elseif mode=="Balanced" then
-                score=dist + hpPct*35 - (isBoss(enemy) and bossWeight or 0)
-            elseif mode=="Specific Name" then score=dist end
-            if score < bestScore then bestScore,bestModel,bestPart=score,enemy,part end
+    local candidates = {}
+    local stickyInfo = nil
+    for _, enemy in ipairs(enemies:GetChildren()) do
+        local c = inspect(enemy)
+        if c then
+            candidates[#candidates + 1] = c
+            if enemy == WHITE_BLOX_STICKY_TARGET then stickyInfo = c end
         end
     end
-    if bestPart then
-        WHITE_BLOX_STICKY_TARGET=bestModel
-        WHITE_BLOX_STICKY_UNTIL=os.clock()+(tonumber(v32.TargetStickTime) or 1.25)
-        return {Model=bestModel,Part=bestPart}
+
+    if #candidates == 0 then
+        WHITE_BLOX_CLEAR_TARGET_LOCK()
+        return nil
     end
-    WHITE_BLOX_STICKY_TARGET=nil
-    return nil
+
+    local function better(a, b)
+        if not b then return true end
+        if mode == "Lowest HP" then
+            if a.HP ~= b.HP then return a.HP < b.HP end
+        elseif mode == "Highest HP" then
+            if a.HP ~= b.HP then return a.HP > b.HP end
+        elseif mode == "Boss First" then
+            if a.Boss ~= b.Boss then return a.Boss end
+        elseif mode == "Balanced" then
+            if a.Boss ~= b.Boss then return a.Boss end
+            local ah, bh = math.floor(a.HPPct * 10), math.floor(b.HPPct * 10)
+            if ah ~= bh then return ah > bh end
+        end
+        return a.Distance < b.Distance
+    end
+
+    local best = nil
+    for _, c in ipairs(candidates) do
+        if better(c, best) then best = c end
+    end
+
+    -- Short commitment window prevents target ping-pong while keeping movement responsive.
+    local stickTime = math.max(0, tonumber(v32.TargetStickTime) or 0.35)
+    if stickyInfo and os.clock() < WHITE_BLOX_STICKY_UNTIL then
+        -- Boss priority may interrupt immediately if a boss appears.
+        if not (mode == "Boss First" and best.Boss and not stickyInfo.Boss) then
+            best = stickyInfo
+        end
+    end
+
+    if best.Model ~= WHITE_BLOX_STICKY_TARGET then
+        WHITE_BLOX_STICKY_TARGET = best.Model
+        WHITE_BLOX_STICKY_UNTIL = os.clock() + stickTime
+    end
+
+    return {Model=best.Model, Part=best.Part}
 end
 local function v162(v492)
 	local v493 = 0;
@@ -5337,8 +5398,7 @@ v88:AddDropdown({
     ["Callback"] = function(value)
         local selected = (type(value) == "table" and (value[1] or next(value))) or value
         v32.TargetMode = tostring(selected or "Nearest")
-        v156 = nil
-        v157 = 0
+        WHITE_BLOX_CLEAR_TARGET_LOCK()
         v37()
     end
 })
@@ -5349,14 +5409,13 @@ v88:AddTextBox({
     ["Placeholder"] = "Ex: Boss, Knight, Orc...",
     ["Callback"] = function(value)
         v32.TargetName = tostring(value or "")
-        v156 = nil
-        v157 = 0
+        WHITE_BLOX_CLEAR_TARGET_LOCK()
         v37()
     end
 })
 
-v88:AddSlider({["Name"]="Target Max Distance (0 = unlimited)",["Min"]=0,["Max"]=500,["Default"]=tonumber(v32.TargetMaxDistance) or 0,["Callback"]=function(v) v32.TargetMaxDistance=tonumber(v) or 0; v156=nil; v37() end})
-v88:AddSlider({["Name"]="Target Stick Time",["Min"]=0,["Max"]=4,["Default"]=tonumber(v32.TargetStickTime) or 1.25,["Callback"]=function(v) v32.TargetStickTime=tonumber(v) or 1.25; v37() end})
+v88:AddSlider({["Name"]="Target Max Distance (0 = unlimited)",["Min"]=0,["Max"]=500,["Default"]=tonumber(v32.TargetMaxDistance) or 0,["Callback"]=function(v) v32.TargetMaxDistance=tonumber(v) or 0; WHITE_BLOX_CLEAR_TARGET_LOCK(); v37() end})
+v88:AddSlider({["Name"]="Target Stick Time",["Min"]=0,["Max"]=4,["Default"]=tonumber(v32.TargetStickTime) or 1.25,["Callback"]=function(v) v32.TargetStickTime=tonumber(v) or 0.35; WHITE_BLOX_CLEAR_TARGET_LOCK(); v37() end})
 
 v88:AddToggle({
     ["Name"] = "Auto Dodge / Esquive auto",
