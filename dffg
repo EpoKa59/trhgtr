@@ -5344,148 +5344,107 @@ task.spawn(function()
 		end
 	end
 end);
--- white blox: Auto Replay - ONE click per end screen
+-- white blox: Auto Replay V4.3
+-- One real click only when a visible end/results screen contains Play Again.
 do
     local replayGui = v16:FindFirstChildOfClass("PlayerGui")
-    local replayHandledButton = nil
-    local replayScanQueued = false
+    local replayLocked = false
+    local replayQueued = false
 
-    local function replayText(obj)
-        local out = string.lower(tostring(obj.Name or ""))
-        if obj:IsA("TextButton") then
-            out = out .. " " .. string.lower(tostring(obj.Text or ""))
-        end
-        for _, d in ipairs(obj:GetDescendants()) do
-            if d:IsA("TextLabel") or d:IsA("TextButton") then
-                out = out .. " " .. string.lower(tostring(d.Text or ""))
-            end
-        end
-        return out
-    end
-
-    local function isEndRunContainer(obj)
-        local cur, depth = obj, 0
-        while cur and cur ~= replayGui and depth < 8 do
-            local n = string.lower(tostring(cur.Name or ""))
-            if n:find("result",1,true)
-                or n:find("reward",1,true)
-                or n:find("victory",1,true)
-                or n:find("complete",1,true)
-                or n:find("finish",1,true)
-                or n:find("end",1,true) then
-                -- Hidden/preloaded result screens must NEVER trigger a click during gameplay.
-                local visible = true
-                if cur:IsA("GuiObject") then
-                    visible = cur.Visible
-                elseif cur:IsA("ScreenGui") then
-                    visible = cur.Enabled
-                end
-                if visible then
-                    return true
-                end
-            end
+    local function isActuallyVisible(obj)
+        local cur = obj
+        while cur and cur ~= replayGui do
+            if cur:IsA("GuiObject") and not cur.Visible then return false end
+            if cur:IsA("ScreenGui") and not cur.Enabled then return false end
             cur = cur.Parent
-            depth = depth + 1
         end
-        return false
+        return true
     end
 
-    local function isReplayButton(obj)
-        if not obj or not (obj:IsA("TextButton") or obj:IsA("ImageButton")) then return false end
-        if not isEndRunContainer(obj) then return false end
-        local t = replayText(obj)
-        return t:find("playagain",1,true) ~= nil
-            or t:find("play again",1,true) ~= nil
-            or t:find("replay",1,true) ~= nil
-    end
-
-    local function clickReplayOnce(button)
-        if not v32.AutoReplay or not button or not button.Parent then return end
-        if replayHandledButton == button then return end
-
-        -- Lock BEFORE sending input so GUI-change events caused by the click
-        -- cannot queue another click on the same end screen.
-        replayHandledButton = button
-
-        pcall(function()
-            local pos, size = button.AbsolutePosition, button.AbsoluteSize
-            if size.X <= 0 or size.Y <= 0 then
-                replayHandledButton = nil
-                return
+    local function buttonText(button)
+        local parts = {string.lower(tostring(button.Name or ""))}
+        if button:IsA("TextButton") then
+            parts[#parts + 1] = string.lower(tostring(button.Text or ""))
+        end
+        for _, d in ipairs(button:GetDescendants()) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") then
+                parts[#parts + 1] = string.lower(tostring(d.Text or ""))
             end
-            local x, y = pos.X + size.X * 0.5, pos.Y + size.Y * 0.5
+        end
+        return table.concat(parts, " ")
+    end
+
+    local function isReplayButton(button)
+        if not button or not (button:IsA("TextButton") or button:IsA("ImageButton")) then return false end
+        if not isActuallyVisible(button) then return false end
+        local t = buttonText(button)
+        return t:find("play again", 1, true) ~= nil
+            or t:find("playagain", 1, true) ~= nil
+            or t:find("replay", 1, true) ~= nil
+    end
+
+    local function clickOnce(button)
+        if replayLocked or not v32.AutoReplay or not isReplayButton(button) then return end
+        local size = button.AbsoluteSize
+        if size.X <= 0 or size.Y <= 0 then return end
+
+        replayLocked = true
+        local pos = button.AbsolutePosition
+        pcall(function()
             local vim = game:GetService("VirtualInputManager")
+            local x = pos.X + size.X * 0.5
+            local y = pos.Y + size.Y * 0.5
             vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
             vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
         end)
 
-        -- Only unlock when THIS button is actually removed for the next run.
-        local conn
-        conn = button.AncestryChanged:Connect(function(_, parent)
-            if parent == nil then
-                if replayHandledButton == button then
-                    replayHandledButton = nil
-                end
-                if conn then conn:Disconnect() end
+        -- Keep the lock while this results UI remains on screen.
+        task.spawn(function()
+            while button.Parent and isActuallyVisible(button) do
+                task.wait(0.10)
             end
+            replayLocked = false
         end)
     end
 
-    local function scanOnce()
-        if not v32.AutoReplay or not replayGui or replayHandledButton then return end
+    local function scanVisibleReplay()
+        if replayLocked or not v32.AutoReplay or not replayGui then return end
         for _, obj in ipairs(replayGui:GetDescendants()) do
             if isReplayButton(obj) then
-                clickReplayOnce(obj)
+                clickOnce(obj)
                 return
             end
         end
     end
 
     local function queueScan()
-        if replayScanQueued or replayHandledButton or not v32.AutoReplay then return end
-        replayScanQueued = true
+        if replayQueued or replayLocked or not v32.AutoReplay then return end
+        replayQueued = true
         task.defer(function()
-            replayScanQueued = false
-            scanOnce()
+            replayQueued = false
+            scanVisibleReplay()
         end)
     end
 
-    local function watchEndContainer(obj)
-        if not obj or not (obj:IsA("GuiObject") or obj:IsA("ScreenGui")) then return end
-        local n = string.lower(tostring(obj.Name or ""))
-        local likelyEnd = n:find("result",1,true) or n:find("reward",1,true)
-            or n:find("victory",1,true) or n:find("complete",1,true)
-            or n:find("finish",1,true) or n:find("end",1,true)
-        if not likelyEnd then return end
-
-        local prop = obj:IsA("ScreenGui") and "Enabled" or "Visible"
-        obj:GetPropertyChangedSignal(prop):Connect(function()
-            local shown = obj:IsA("ScreenGui") and obj.Enabled or obj.Visible
-            if shown and v32.AutoReplay then
-                replayHandledButton = nil
-                queueScan()
-            end
-        end)
+    local function watch(obj)
+        if obj:IsA("GuiObject") then
+            obj:GetPropertyChangedSignal("Visible"):Connect(function()
+                if obj.Visible then queueScan() end
+            end)
+        elseif obj:IsA("ScreenGui") then
+            obj:GetPropertyChangedSignal("Enabled"):Connect(function()
+                if obj.Enabled then queueScan() end
+            end)
+        end
     end
 
     if replayGui then
         for _, obj in ipairs(replayGui:GetDescendants()) do
-            watchEndContainer(obj)
+            watch(obj)
         end
-
-        -- No permanent loop. New GUI objects only cause a scan when Auto Replay is enabled.
         replayGui.DescendantAdded:Connect(function(obj)
-            watchEndContainer(obj)
-            if not v32.AutoReplay or replayHandledButton then return end
-            if obj:IsA("GuiObject") then
-                queueScan()
-            end
-        end)
-
-        replayGui.DescendantRemoving:Connect(function(obj)
-            if obj == replayHandledButton then
-                replayHandledButton = nil
-            end
+            watch(obj)
+            queueScan()
         end)
     end
 end;
