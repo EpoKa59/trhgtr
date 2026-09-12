@@ -3846,7 +3846,7 @@ local function v205(v587, v588, v589)
 				local v1203;
 				while true do
 					if (v1202 == (3 - 2)) then
-						v587.CFrame = v194(v1203, v588);
+						-- White Blox V6.6: instant AutoFarm CFrame jump removed; Tween movement continues.
 						v587.AssemblyLinearVelocity = Vector3.zero;
 						v1202 = 2;
 					end
@@ -7115,6 +7115,40 @@ end});
 v99:AddParagraph({[v7("\54\31\24\122\54", "\83\98\118\108\22")]=v7("\104\222\77\2\229\167\15\104\194\84\109\140\170\5\102", "\67\41\139\25\77\197\228"),[v7("\203\161\192\62\83\230\252", "\136\136\206\174\74\54")]="Hourly 1-5 • Daily 1-5 • Weekly 1-5\nAuto mode checks every 12 seconds."});
 v100:AddParagraph({[v7("\24\165\160\134\126", "\168\76\204\212\234\27\174")]=v7("\190\33\4\101\59\194\14\184\54\18\103\34\195\124", "\46\236\100\83\36\105\134"),[v7("\26\245\137\148\132\1\45", "\111\89\154\231\224\225")]=v7("\201\200\7\166\39\234\156\222\243\214\31\229\2\220\235\145\244\206\3\168\63\185\221\213\249\223\2\229\56\246\156\248\243\204\3\171\56\246\206\200\189\219\0\177\41\235\156\197\245\223\70\177\62\248\223\218\248\200\70\172\63\185\221\195\240\223\2\235\108\208\200\212\240\201\70\183\41\250\217\216\235\223\2\229\47\245\211\194\248\154\18\170\43\252\200\217\248\200\70\164\62\252\156\214\239\213\19\181\41\253\156\216\243\206\9\229\35\247\217\145\216\212\1\169\37\234\212\145\217\211\21\166\35\235\216\145\248\215\4\160\40\183\156\244\229\211\21\177\37\247\219\145\255\219\1\229\47\246\210\197\248\212\18\182\108\248\206\212\189\211\1\171\35\235\217\213\179", "\177\157\186\102\197\76\153\188")});
 
+
+
+-- White Blox V6.5: stable target guard.
+-- Functional fix only: avoid unnecessary target swaps while the current mob is still valid.
+-- Does not alter movement/teleport distances, speed, or anti-cheat behavior.
+local WHITE_BLOX_STABLE_TARGET = nil
+local WHITE_BLOX_STABLE_TARGET_UNTIL = 0
+
+local function WHITE_BLOX_TARGET_ALIVE(target)
+    if not target or not target.Parent then return false end
+    local model = target:IsA("Model") and target or target:FindFirstAncestorOfClass("Model")
+    if not model or not model.Parent then return false end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    return hum ~= nil and hum.Health > 0
+end
+
+local function WHITE_BLOX_REMEMBER_TARGET(target)
+    if target and WHITE_BLOX_TARGET_ALIVE(target) then
+        WHITE_BLOX_STABLE_TARGET = target
+        WHITE_BLOX_STABLE_TARGET_UNTIL = os.clock() + 0.35
+    end
+end
+
+local function WHITE_BLOX_CURRENT_TARGET_OR(candidate)
+    if WHITE_BLOX_STABLE_TARGET and not WHITE_BLOX_TARGET_ALIVE(WHITE_BLOX_STABLE_TARGET) then
+        WHITE_BLOX_STABLE_TARGET = nil
+        WHITE_BLOX_STABLE_TARGET_UNTIL = 0
+    end
+    if WHITE_BLOX_STABLE_TARGET and os.clock() < WHITE_BLOX_STABLE_TARGET_UNTIL then
+        return WHITE_BLOX_STABLE_TARGET
+    end
+    WHITE_BLOX_REMEMBER_TARGET(candidate)
+    return candidate
+end
 
 -- White Blox V6.4: Auto Skip Wave
 v32.AutoSkipWave = (v32.AutoSkipWave == true)
