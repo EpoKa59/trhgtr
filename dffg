@@ -3377,7 +3377,7 @@ local function v192()
 				if (not v893 and v892) then
 					for v1362, v1363 in ipairs(v892:GetDescendants()) do
 						if ((v1363.Name == v7("\192\206\39\245\209\197\39\229\254", "\140\144\162\70")) and (v1363:IsA(v7("\247\61\80\80\251\196\60\86\124", "\142\176\72\57\18")) or v1363:IsA(v7("\146\52\8\48\132\36\4\48\169\63", "\68\198\81\112")) or v1363:IsA(v7("\158\2\177\19\73\63\162\27\164\27\66", "\125\215\111\208\116\44")))) then
-							if (v1363.Visible and (v1363.AbsoluteSize.X > (0 - 0)) and (v1363.AbsoluteSize.Y > (0 - 0))) then
+							if ((v1363.AbsoluteSize.X > (0 - 0)) and (v1363.AbsoluteSize.Y > (0 - 0))) then
 								v893 = v1363;
 								break;
 							end
@@ -3401,7 +3401,7 @@ local function v192()
 				end
 			end
 			if (v891 == (1029 - (847 + 180))) then
-				if (v893 and v893.Visible) then
+				if (v893 and v893.Parent) then
 					local v1293 = 0 + 0;
 					while true do
 						if (v1293 == 1) then
