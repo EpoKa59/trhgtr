@@ -3807,8 +3807,8 @@ local function v204()
 	end
 end
 local function v205(v587, v588, v589)
-	-- White Blox V6.7: AutoFarm movement is 100% controlled by TweenSpeed.
-	-- No instant CFrame reposition and no special long-distance movement branch.
+	-- White Blox V6.8: smoother long-distance tween movement.
+	-- TweenSpeed remains the only AutoFarm movement speed control.
 	if WHITE_BLOX_DODGING then
 		v204();
 		return;
@@ -3819,40 +3819,42 @@ local function v205(v587, v588, v589)
 	end
 
 	local destination = v589.Position;
-	local currentPosition = v587.Position;
-	local distance = (destination - currentPosition).Magnitude;
-
+	local distance = (destination - v587.Position).Magnitude;
 	if distance <= 1 then
 		v204();
 		return;
 	end
 
-	local targetCFrame = v194(destination, v588);
 	local targetChanged = v202 ~= v588;
-	local destinationChanged = not v203 or ((v203 - destination).Magnitude > 2.5);
+	local destinationMoved = not v203 or ((v203 - destination).Magnitude > 6);
 
-	if not v201 or targetChanged or destinationChanged then
+	-- Do not constantly cancel/recreate the same long tween for tiny enemy movements.
+	-- A new tween is made only for a real target change, a meaningful destination change,
+	-- or after the previous tween has completed.
+	if not v201 or targetChanged or destinationMoved then
 		v204();
 
-		-- The slider is now the single movement-speed source for AutoFarm.
 		local tweenSpeed = math.clamp(tonumber(v32.TweenSpeed) or 75, 40, 150);
+		local targetCFrame = v194(destination, v588);
 		local duration = math.max(distance / tweenSpeed, 0.05);
 
 		v202 = v588;
 		v203 = destination;
-		v201 = v23:Create(
+
+		local tween = v23:Create(
 			v587,
 			TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
 			{CFrame = targetCFrame}
 		);
+		v201 = tween;
 
-		local thisTween = v201;
-		thisTween.Completed:Connect(function()
-			if v201 == thisTween then
+		tween.Completed:Connect(function()
+			if v201 == tween then
 				v201 = nil;
 			end
 		end);
-		thisTween:Play();
+
+		tween:Play();
 	end
 end
 
