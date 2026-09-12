@@ -5344,12 +5344,11 @@ task.spawn(function()
 		end
 	end
 end);
--- white blox: event-driven Auto Replay
--- No permanent 0.02s GUI scan. It wakes only when the PlayerGui changes.
+-- white blox: Auto Replay - ONE click per end screen
 do
     local replayGui = v16:FindFirstChildOfClass("PlayerGui")
-    local replayLastClick = 0
-    local replayQueued = false
+    local replayHandledButton = nil
+    local replayScanQueued = false
 
     local function replayText(obj)
         local out = string.lower(tostring(obj.Name or ""))
@@ -5391,61 +5390,70 @@ do
             or t:find("replay",1,true) ~= nil
     end
 
-    local function clickReplay(button)
+    local function clickReplayOnce(button)
         if not v32.AutoReplay or not button or not button.Parent then return end
-        if os.clock() - replayLastClick < 0.35 then return end
-        replayLastClick = os.clock()
+        if replayHandledButton == button then return end
 
-        -- Use the method that actually worked, but only once when the end UI changes.
+        -- Lock BEFORE sending input so GUI-change events caused by the click
+        -- cannot queue another click on the same end screen.
+        replayHandledButton = button
+
         pcall(function()
             local pos, size = button.AbsolutePosition, button.AbsoluteSize
-            if size.X > 0 and size.Y > 0 then
-                local x, y = pos.X + size.X * 0.5, pos.Y + size.Y * 0.5
-                local vim = game:GetService("VirtualInputManager")
-                vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
-                vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            if size.X <= 0 or size.Y <= 0 then
+                replayHandledButton = nil
+                return
+            end
+            local x, y = pos.X + size.X * 0.5, pos.Y + size.Y * 0.5
+            local vim = game:GetService("VirtualInputManager")
+            vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        end)
+
+        -- Only unlock when THIS button is actually removed for the next run.
+        local conn
+        conn = button.AncestryChanged:Connect(function(_, parent)
+            if parent == nil then
+                if replayHandledButton == button then
+                    replayHandledButton = nil
+                end
+                if conn then conn:Disconnect() end
             end
         end)
     end
 
     local function scanOnce()
-        if not v32.AutoReplay or not replayGui then return end
+        if not v32.AutoReplay or not replayGui or replayHandledButton then return end
         for _, obj in ipairs(replayGui:GetDescendants()) do
             if isReplayButton(obj) then
-                clickReplay(obj)
+                clickReplayOnce(obj)
                 return
             end
         end
     end
 
     local function queueScan()
-        if replayQueued or not v32.AutoReplay then return end
-        replayQueued = true
+        if replayScanQueued or replayHandledButton or not v32.AutoReplay then return end
+        replayScanQueued = true
         task.defer(function()
-            -- Let text/size properties settle for one scheduler turn.
+            replayScanQueued = false
             scanOnce()
-            replayQueued = false
         end)
     end
 
     if replayGui then
-        replayGui.DescendantAdded:Connect(queueScan)
-        replayGui.DescendantRemoving:Connect(queueScan)
-
-        -- Covers end screens that are pre-created and only toggled Visible.
-        for _, obj in ipairs(replayGui:GetDescendants()) do
-            if obj:IsA("GuiObject") then
-                obj:GetPropertyChangedSignal("Visible"):Connect(function()
-                    if obj.Visible then queueScan() end
-                end)
-            end
-        end
-
+        -- No permanent loop and no listeners on every GuiObject.
+        -- We only react when the GUI tree itself changes.
         replayGui.DescendantAdded:Connect(function(obj)
+            if not v32.AutoReplay or replayHandledButton then return end
             if obj:IsA("GuiObject") then
-                obj:GetPropertyChangedSignal("Visible"):Connect(function()
-                    if obj.Visible then queueScan() end
-                end)
+                queueScan()
+            end
+        end)
+
+        replayGui.DescendantRemoving:Connect(function(obj)
+            if obj == replayHandledButton then
+                replayHandledButton = nil
             end
         end)
     end
