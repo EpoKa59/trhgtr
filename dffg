@@ -332,17 +332,14 @@ v33.LoadSettings = function()
 end;
 v33.LoadSettings();
 pcall(function()
-	local v317 = 0 - 0;
-	local v318;
-	while true do
-		if (v317 == (0 + 0)) then
-			v318 = (getgenv and getgenv()) or _G;
-			if (v318 and (v318.WHITE_BLOX_FORCE_REEXEC == true)) then
-				v32.AutoReExecute = true;
-			end
-			break;
-		end
+	local env = (getgenv and getgenv()) or _G;
+	if env then
+		env.WHITE_BLOX_FORCE_REEXEC = false;
 	end
+end);
+task.delay(10, function()
+	local env = (getgenv and getgenv()) or _G;
+	if env then env.WHITE_BLOX_REEXEC_ONESHOT = false; end
 end);
 v33.ReExecuteArmed = false;
 v33.ReExecuteLastError = nil;
@@ -353,7 +350,7 @@ pcall(function()
 
     pcall(function()
         local env = getgenv and getgenv() or _G
-        if env then env.WHITE_BLOX_FORCE_REEXEC = true end
+        if env then env.WHITE_BLOX_FORCE_REEXEC = false end
     end)
 
     if not game:IsLoaded() then game.Loaded:Wait() end
@@ -366,6 +363,14 @@ pcall(function()
     until os.clock() >= deadline
 
     task.wait(1.5)
+
+    local env = getgenv and getgenv() or _G
+    if env and env.WHITE_BLOX_REEXEC_ONESHOT then
+        return
+    end
+    if env then
+        env.WHITE_BLOX_REEXEC_ONESHOT = true
+    end
 
     local sourceUrl = "https://raw.githubusercontent.com/EpoKa59/trhgtr/main/dffg"
     for attempt = 1, 6 do
