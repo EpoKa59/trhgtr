@@ -5344,44 +5344,100 @@ task.spawn(function()
 		end
 	end
 end);
--- white blox: faster Auto Replay
--- React immediately when the end-of-run UI/button is created,
--- with a light fallback check in case the UI already existed.
+-- white blox: direct Auto Replay watcher
+-- Watches only clickable GUI objects and clicks PlayAgain/Replay as soon as Roblox creates them.
 do
-	local replayGui = v16:FindFirstChildOfClass("PlayerGui")
+    local replayGui = v16:FindFirstChildOfClass("PlayerGui")
+    local replayLastClick = 0
 
-	local function tryFastReplay(obj)
-		if not v32.AutoReplay or v105 then
-			return
-		end
+    local function replayText(obj)
+        local out = string.lower(tostring(obj.Name or ""))
+        if obj:IsA("TextButton") then
+            out = out .. " " .. string.lower(tostring(obj.Text or ""))
+        end
+        for _, d in ipairs(obj:GetDescendants()) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") then
+                out = out .. " " .. string.lower(tostring(d.Text or ""))
+            end
+        end
+        return out
+    end
 
-		if obj then
-			local name = string.lower(tostring(obj.Name or ""))
-			if name == "playagain" or name:find("playagain", 1, true) or name:find("replay", 1, true) then
-				task.spawn(v192)
-				return
-			end
-		end
+    local function isReplayButton(obj)
+        if not obj or not (obj:IsA("TextButton") or obj:IsA("ImageButton")) then return false end
+        local t = replayText(obj)
+        return t:find("playagain",1,true) ~= nil
+            or t:find("play again",1,true) ~= nil
+            or t:find("replay",1,true) ~= nil
+    end
 
-		task.spawn(v192)
-	end
+    local function directReplayClick(button)
+        if not v32.AutoReplay or not button or not button.Parent then return false end
+        if os.clock() - replayLastClick < 0.20 then return false end
 
-	if replayGui then
-		replayGui.DescendantAdded:Connect(function(obj)
-			if v32.AutoReplay then
-				tryFastReplay(obj)
-			end
-		end)
-	end
+        replayLastClick = os.clock()
+        local fired = false
 
-	task.spawn(function()
-		while true do
-			task.wait(0.03)
-			if v32.AutoReplay and not v105 then
-				v192()
-			end
-		end
-	end)
+        if firesignal then
+            pcall(function() firesignal(button.Activated); fired = true end)
+            pcall(function() firesignal(button.MouseButton1Click); fired = true end)
+        end
+        if getconnections then
+            pcall(function()
+                for _, c in ipairs(getconnections(button.Activated)) do c:Fire(); fired = true end
+            end)
+            pcall(function()
+                for _, c in ipairs(getconnections(button.MouseButton1Click)) do c:Fire(); fired = true end
+            end)
+        end
+        if not fired then
+            pcall(function() button:Activate(); fired = true end)
+        end
+        return fired
+    end
+
+    local function scanReplayButtons()
+        if not v32.AutoReplay or not replayGui then return end
+        for _, obj in ipairs(replayGui:GetDescendants()) do
+            if isReplayButton(obj) then
+                directReplayClick(obj)
+                return
+            end
+        end
+    end
+
+    if replayGui then
+        replayGui.DescendantAdded:Connect(function(obj)
+            if not v32.AutoReplay then return end
+
+            -- The button itself may be added first and its text one frame later.
+            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                task.defer(function()
+                    if isReplayButton(obj) then directReplayClick(obj) end
+                end)
+            elseif obj:IsA("TextLabel") then
+                local parent = obj.Parent
+                while parent and parent ~= replayGui do
+                    if parent:IsA("TextButton") or parent:IsA("ImageButton") then
+                        task.defer(function()
+                            if isReplayButton(parent) then directReplayClick(parent) end
+                        end)
+                        break
+                    end
+                    parent = parent.Parent
+                end
+            end
+        end)
+    end
+
+    -- Fast fallback for UIs that reuse an already-created hidden button.
+    task.spawn(function()
+        while task.wait(0.02) do
+            if v32.AutoReplay then
+                scanReplayButtons()
+            end
+        end
+    end)
 end;
 v88:AddToggle({[v7("\148\187\39\0", "\62\218\218\74\101\30\205\146")]="Auto Farm Enemies / เปิดฟาร์มอัตโนมัติ",[v7("\102\172\127\240\200\50\80", "\79\34\201\25\145\189\94\36")]=v32.AutoFarm,[v7("\99\45\230\6\66\85\67\39", "\52\32\76\138\106\32")]=function(v679)
 	local v680 = 0 - 0;
