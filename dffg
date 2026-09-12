@@ -2588,6 +2588,17 @@ local function v161()
         }
     end
 
+    -- A dead/removed target must never consume the sticky timer.
+    if WHITE_BLOX_STICKY_TARGET then
+        local stickyHum = WHITE_BLOX_STICKY_TARGET:FindFirstChildOfClass("Humanoid")
+        if (not WHITE_BLOX_STICKY_TARGET.Parent) or (stickyHum and stickyHum.Health <= 0) then
+            WHITE_BLOX_STICKY_TARGET = nil
+            WHITE_BLOX_STICKY_UNTIL = 0
+            v156 = nil
+            v157 = 0
+        end
+    end
+
     local candidates = {}
     local stickyInfo = nil
     for _, enemy in ipairs(enemies:GetChildren()) do
@@ -2641,6 +2652,15 @@ local function v161()
     return {Model=best.Model, Part=best.Part}
 end
 local function v162(v492)
+    if v156 and v156.Model then
+        local cachedHum = v156.Model:FindFirstChildOfClass("Humanoid")
+        if (not v156.Model.Parent) or (cachedHum and cachedHum.Health <= 0) then
+            v156 = nil
+            v157 = 0
+            WHITE_BLOX_STICKY_TARGET = nil
+            WHITE_BLOX_STICKY_UNTIL = 0
+        end
+    end
 	local v493 = 0;
 	local v494;
 	while true do
