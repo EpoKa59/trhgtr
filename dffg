@@ -337,7 +337,7 @@ pcall(function()
 	while true do
 		if (v317 == (0 + 0)) then
 			v318 = (getgenv and getgenv()) or _G;
-			if (v318 and (v318.white blox_FORCE_REEXEC == true)) then
+			if (v318 and (v318.WHITE_BLOX_FORCE_REEXEC == true)) then
 				v32.AutoReExecute = true;
 			end
 			break;
@@ -353,7 +353,7 @@ pcall(function()
 
     pcall(function()
         local env = getgenv and getgenv() or _G
-        if env then env.white blox_FORCE_REEXEC = true end
+        if env then env.WHITE_BLOX_FORCE_REEXEC = true end
     end)
 
     if not game:IsLoaded() then game.Loaded:Wait() end
@@ -1201,14 +1201,14 @@ pcall(function()
 		if (v362 == (0 + 0)) then
 			v363 = (getgenv and getgenv()) or _G;
 			if v363 then
-				v363.white blox_CLEANUP = function()
+				v363.WHITE_BLOX_CLEANUP = function()
 					local v1266 = 0 - 0;
 					while true do
 						if (v1266 == (0 + 0)) then
 							pcall(function()
 								v76:Destroy();
 							end);
-							v363.white blox_CLEANUP = nil;
+							v363.WHITE_BLOX_CLEANUP = nil;
 							break;
 						end
 					end
@@ -2515,8 +2515,8 @@ local function v160(v483)
 	local v484 = v483.Model:FindFirstChildOfClass(v7("\249\53\200\122\241\71\68\213", "\45\177\64\165\27\159\40"));
 	return not v484 or (v484.Health > (0 - 0));
 end
-local white blox_STICKY_TARGET = nil
-local white blox_STICKY_UNTIL = 0
+local WHITE_BLOX_STICKY_TARGET = nil
+local WHITE_BLOX_STICKY_UNTIL = 0
 local function v161()
     local enemies = v159()
     if not enemies then return nil end
@@ -2549,9 +2549,9 @@ local function v161()
     end
 
     -- Sticky targeting prevents rapid target switching while several enemies overlap.
-    if white blox_STICKY_TARGET and os.clock() < white blox_STICKY_UNTIL then
-        local ok,_,part=valid(white blox_STICKY_TARGET)
-        if ok then return {Model=white blox_STICKY_TARGET,Part=part} end
+    if WHITE_BLOX_STICKY_TARGET and os.clock() < WHITE_BLOX_STICKY_UNTIL then
+        local ok,_,part=valid(WHITE_BLOX_STICKY_TARGET)
+        if ok then return {Model=WHITE_BLOX_STICKY_TARGET,Part=part} end
     end
 
     local bestModel,bestPart,bestScore=nil,nil,math.huge
@@ -2572,11 +2572,11 @@ local function v161()
         end
     end
     if bestPart then
-        white blox_STICKY_TARGET=bestModel
-        white blox_STICKY_UNTIL=os.clock()+(tonumber(v32.TargetStickTime) or 1.25)
+        WHITE_BLOX_STICKY_TARGET=bestModel
+        WHITE_BLOX_STICKY_UNTIL=os.clock()+(tonumber(v32.TargetStickTime) or 1.25)
         return {Model=bestModel,Part=bestPart}
     end
-    white blox_STICKY_TARGET=nil
+    WHITE_BLOX_STICKY_TARGET=nil
     return nil
 end
 local function v162(v492)
@@ -3717,7 +3717,7 @@ local function v204()
 	end
 end
 local function v205(v587, v588, v589)
-	if white blox_DODGING then
+	if WHITE_BLOX_DODGING then
 		v204();
 		return;
 	end
@@ -3806,12 +3806,12 @@ end
 -- Generic animation-aware auto dodge.
 -- It reacts only to Action-priority animations from the current target and
 -- briefly pauses the farm tween so the sidestep is not instantly cancelled.
-white blox_DODGING = false
-local white blox_LAST_DODGE = 0
-local white blox_DODGE_SIDE = 1
-local white blox_LAST_ANIMATION = {}
+WHITE_BLOX_DODGING = false
+local WHITE_BLOX_LAST_DODGE = 0
+local WHITE_BLOX_DODGE_SIDE = 1
+local WHITE_BLOX_LAST_ANIMATION = {}
 
-local function white blox_ShouldDodge(targetModel, targetPart, root)
+local function WHITE_BLOX_ShouldDodge(targetModel, targetPart, root)
     if not targetModel or not targetPart or not root then return false end
     local maxDistance = tonumber(v32.DodgeTriggerDistance) or 18
     if (targetPart.Position - root.Position).Magnitude > maxDistance then return false end
@@ -3826,9 +3826,9 @@ local function white blox_ShouldDodge(targetModel, targetPart, root)
         if track.IsPlaying and priority >= Enum.AnimationPriority.Action.Value and track.TimePosition > 0.04 then
             local animation = track.Animation
             local id = animation and animation.AnimationId or tostring(track)
-            local last = white blox_LAST_ANIMATION[id] or 0
+            local last = WHITE_BLOX_LAST_ANIMATION[id] or 0
             if now - last > 0.55 then
-                white blox_LAST_ANIMATION[id] = now
+                WHITE_BLOX_LAST_ANIMATION[id] = now
                 return true
             end
         end
@@ -3836,8 +3836,8 @@ local function white blox_ShouldDodge(targetModel, targetPart, root)
     return false
 end
 
-local function white blox_DoDodge(targetPart)
-    if white blox_DODGING then return end
+local function WHITE_BLOX_DoDodge(targetPart)
+    if WHITE_BLOX_DODGING then return end
     local character = v16.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -3845,14 +3845,14 @@ local function white blox_DoDodge(targetPart)
 
     local now = os.clock()
     local cooldown = tonumber(v32.DodgeCooldown) or 0.85
-    if now - white blox_LAST_DODGE < cooldown then return end
-    white blox_LAST_DODGE = now
-    white blox_DODGING = true
+    if now - WHITE_BLOX_LAST_DODGE < cooldown then return end
+    WHITE_BLOX_LAST_DODGE = now
+    WHITE_BLOX_DODGING = true
     local dodgeMode = tostring(v32.DodgeMode or "Alternate")
-    if dodgeMode == "Left" then white blox_DODGE_SIDE = -1
-    elseif dodgeMode == "Right" then white blox_DODGE_SIDE = 1
-    elseif dodgeMode == "Random" then white blox_DODGE_SIDE = (math.random(0,1)==0 and -1 or 1)
-    else white blox_DODGE_SIDE = -white blox_DODGE_SIDE end
+    if dodgeMode == "Left" then WHITE_BLOX_DODGE_SIDE = -1
+    elseif dodgeMode == "Right" then WHITE_BLOX_DODGE_SIDE = 1
+    elseif dodgeMode == "Random" then WHITE_BLOX_DODGE_SIDE = (math.random(0,1)==0 and -1 or 1)
+    else WHITE_BLOX_DODGE_SIDE = -WHITE_BLOX_DODGE_SIDE end
 
     pcall(v204) -- cancel current farm tween
 
@@ -3862,33 +3862,33 @@ local function white blox_DoDodge(targetPart)
     forward = Vector3.new(forward.X, 0, forward.Z).Unit
     local right = Vector3.new(-forward.Z, 0, forward.X)
     local amount = tonumber(v32.DodgeDistance) or 10
-    local destination = root.Position + right * amount * white blox_DODGE_SIDE
+    local destination = root.Position + right * amount * WHITE_BLOX_DODGE_SIDE
     local face = Vector3.new(targetPart.Position.X, destination.Y, targetPart.Position.Z)
     local goal = CFrame.lookAt(destination, face)
 
     local tween = v23:Create(root, TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {CFrame = goal})
     tween:Play()
     task.delay(0.16, function()
-        white blox_DODGING = false
+        WHITE_BLOX_DODGING = false
     end)
 end
 
 task.spawn(function()
     while true do
         task.wait(v32.AutoDodge and 0.05 or 0.25)
-        if v32.AutoDodge and v32.AutoFarm and not white blox_DODGING then
+        if v32.AutoDodge and v32.AutoFarm and not WHITE_BLOX_DODGING then
             local target = v162(false)
             local character = v16.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
-            if target and target.Model and target.Part and white blox_ShouldDodge(target.Model, target.Part, root) then
-                white blox_DoDodge(target.Part)
+            if target and target.Model and target.Part and WHITE_BLOX_ShouldDodge(target.Model, target.Part, root) then
+                WHITE_BLOX_DoDodge(target.Part)
             end
         end
     end
 end)
 
 -- Low-health safety: temporarily pauses farm movement and steps away from the current target.
-white blox_SAFETY_ACTIVE = false
+WHITE_BLOX_SAFETY_ACTIVE = false
 task.spawn(function()
     while true do
         task.wait(v32.AutoSafety and 0.12 or 0.5)
@@ -3897,9 +3897,9 @@ task.spawn(function()
         local root=character and character:FindFirstChild("HumanoidRootPart")
         if v32.AutoSafety and hum and root and hum.MaxHealth>0 and hum.Health>0 then
             local hp=hum.Health/hum.MaxHealth*100
-            if not white blox_SAFETY_ACTIVE and hp <= (tonumber(v32.RetreatHP) or 25) then white blox_SAFETY_ACTIVE=true end
-            if white blox_SAFETY_ACTIVE and hp >= (tonumber(v32.ResumeHP) or 65) then white blox_SAFETY_ACTIVE=false end
-            if white blox_SAFETY_ACTIVE then
+            if not WHITE_BLOX_SAFETY_ACTIVE and hp <= (tonumber(v32.RetreatHP) or 25) then WHITE_BLOX_SAFETY_ACTIVE=true end
+            if WHITE_BLOX_SAFETY_ACTIVE and hp >= (tonumber(v32.ResumeHP) or 65) then WHITE_BLOX_SAFETY_ACTIVE=false end
+            if WHITE_BLOX_SAFETY_ACTIVE then
                 pcall(v204)
                 local target=v162(false)
                 if target and target.Part then
@@ -3911,7 +3911,7 @@ task.spawn(function()
                 end
             end
         else
-            white blox_SAFETY_ACTIVE=false
+            WHITE_BLOX_SAFETY_ACTIVE=false
         end
     end
 end)
@@ -5363,7 +5363,7 @@ v88:AddToggle({
     ["Default"] = v32.AutoDodge or false,
     ["Callback"] = function(value)
         v32.AutoDodge = value and true or false
-        if not v32.AutoDodge then white blox_DODGING = false end
+        if not v32.AutoDodge then WHITE_BLOX_DODGING = false end
         v37()
     end
 })
@@ -5391,7 +5391,7 @@ v88:AddSlider({
 })
 
 v88:AddDropdown({["Name"]="Dodge Direction",["Default"]=v32.DodgeMode or "Alternate",["Values"]={"Alternate","Random","Left","Right"},["Multi"]=false,["Callback"]=function(v) local x=(type(v)=="table" and (v[1] or next(v))) or v; v32.DodgeMode=tostring(x or "Alternate"); v37() end})
-v88:AddToggle({["Name"]="Auto Safety / Low HP Retreat",["Default"]=v32.AutoSafety or false,["Callback"]=function(v) v32.AutoSafety=v and true or false; if not v then white blox_SAFETY_ACTIVE=false end; v37() end})
+v88:AddToggle({["Name"]="Auto Safety / Low HP Retreat",["Default"]=v32.AutoSafety or false,["Callback"]=function(v) v32.AutoSafety=v and true or false; if not v then WHITE_BLOX_SAFETY_ACTIVE=false end; v37() end})
 v88:AddSlider({["Name"]="Retreat HP %",["Min"]=5,["Max"]=60,["Default"]=tonumber(v32.RetreatHP) or 25,["Callback"]=function(v) v32.RetreatHP=tonumber(v) or 25; v37() end})
 v88:AddSlider({["Name"]="Resume HP %",["Min"]=20,["Max"]=100,["Default"]=tonumber(v32.ResumeHP) or 65,["Callback"]=function(v) v32.ResumeHP=tonumber(v) or 65; v37() end})
 v88:AddSlider({["Name"]="Retreat Distance",["Min"]=6,["Max"]=40,["Default"]=tonumber(v32.RetreatDistance) or 18,["Callback"]=function(v) v32.RetreatDistance=tonumber(v) or 18; v37() end})
@@ -6881,22 +6881,22 @@ v32.AutoCardSelect = (v32.AutoCardSelect == true)
 v32.CardPriority = tostring(v32.CardPriority or "Rewards > Damage > Crit > Health > Time")
 v32.CardSelectDelay = tonumber(v32.CardSelectDelay) or 0.08
 
-local white blox_CARD_BUSY = false
-local white blox_CARD_LAST = 0
-local white blox_CARD_CACHE = {}
-local white blox_CARD_DIRTY = true
-local white blox_PLAYER_GUI = v16 and v16:FindFirstChildOfClass("PlayerGui")
+local WHITE_BLOX_CARD_BUSY = false
+local WHITE_BLOX_CARD_LAST = 0
+local WHITE_BLOX_CARD_CACHE = {}
+local WHITE_BLOX_CARD_DIRTY = true
+local WHITE_BLOX_PLAYER_GUI = v16 and v16:FindFirstChildOfClass("PlayerGui")
 
-local function white blox_GuiVisible(obj)
+local function WHITE_BLOX_GuiVisible(obj)
     local cur = obj
-    while cur and cur ~= white blox_PLAYER_GUI do
+    while cur and cur ~= WHITE_BLOX_PLAYER_GUI do
         if cur:IsA("GuiObject") and not cur.Visible then return false end
         cur = cur.Parent
     end
     return true
 end
 
-local function white blox_CardKind(button)
+local function WHITE_BLOX_CardKind(button)
     local parts = {}
     if button:IsA("TextButton") then
         local t = tostring(button.Text or "")
@@ -6922,7 +6922,7 @@ local function white blox_CardKind(button)
     return nil
 end
 
-local white blox_CARD_ORDERS = {
+local WHITE_BLOX_CARD_ORDERS = {
     ["Rewards > Damage > Crit > Health > Time"] = {"Rewards","Damage","Crit","Health","Time"},
     ["Damage > Crit > Rewards > Health > Time"] = {"Damage","Crit","Rewards","Health","Time"},
     ["Crit > Damage > Rewards > Health > Time"] = {"Crit","Damage","Rewards","Health","Time"},
@@ -6931,13 +6931,13 @@ local white blox_CARD_ORDERS = {
     ["First Recognized"] = {"Any"},
 }
 
-local function white blox_CardOrder()
-    return white blox_CARD_ORDERS[tostring(v32.CardPriority or "")]
-        or white blox_CARD_ORDERS["Rewards > Damage > Crit > Health > Time"]
+local function WHITE_BLOX_CardOrder()
+    return WHITE_BLOX_CARD_ORDERS[tostring(v32.CardPriority or "")]
+        or WHITE_BLOX_CARD_ORDERS["Rewards > Damage > Crit > Health > Time"]
 end
 
-local function white blox_ClickGuiButton(button)
-    if not button or not button.Parent or not white blox_GuiVisible(button) then return false end
+local function WHITE_BLOX_ClickGuiButton(button)
+    if not button or not button.Parent or not WHITE_BLOX_GuiVisible(button) then return false end
 
     local ok = false
     if firesignal then
@@ -6960,33 +6960,33 @@ local function white blox_ClickGuiButton(button)
     return ok
 end
 
-local function white blox_RebuildCardCache()
-    white blox_CARD_CACHE = {}
-    white blox_CARD_DIRTY = false
-    if not white blox_PLAYER_GUI then return end
+local function WHITE_BLOX_RebuildCardCache()
+    WHITE_BLOX_CARD_CACHE = {}
+    WHITE_BLOX_CARD_DIRTY = false
+    if not WHITE_BLOX_PLAYER_GUI then return end
 
-    for _, obj in ipairs(white blox_PLAYER_GUI:GetDescendants()) do
+    for _, obj in ipairs(WHITE_BLOX_PLAYER_GUI:GetDescendants()) do
         if obj:IsA("ImageButton") or obj:IsA("TextButton") then
-            local kind = white blox_CardKind(obj)
+            local kind = WHITE_BLOX_CardKind(obj)
             if kind then
-                white blox_CARD_CACHE[#white blox_CARD_CACHE + 1] = {Button=obj, Kind=kind}
+                WHITE_BLOX_CARD_CACHE[#WHITE_BLOX_CARD_CACHE + 1] = {Button=obj, Kind=kind}
             end
         end
     end
 end
 
-local function white blox_FindCard()
-    if white blox_CARD_DIRTY then white blox_RebuildCardCache() end
+local function WHITE_BLOX_FindCard()
+    if WHITE_BLOX_CARD_DIRTY then WHITE_BLOX_RebuildCardCache() end
 
     local valid = {}
-    for _, card in ipairs(white blox_CARD_CACHE) do
-        if card.Button and card.Button.Parent and white blox_GuiVisible(card.Button) then
+    for _, card in ipairs(WHITE_BLOX_CARD_CACHE) do
+        if card.Button and card.Button.Parent and WHITE_BLOX_GuiVisible(card.Button) then
             valid[#valid + 1] = card
         end
     end
     if #valid == 0 then return nil end
 
-    local order = white blox_CardOrder()
+    local order = WHITE_BLOX_CardOrder()
     if order[1] == "Any" then return valid[1].Button end
 
     for _, wanted in ipairs(order) do
@@ -6998,31 +6998,31 @@ local function white blox_FindCard()
 end
 
 -- Mark cache dirty only when the GUI actually changes instead of scanning every 0.05 s.
-if white blox_PLAYER_GUI then
-    white blox_PLAYER_GUI.DescendantAdded:Connect(function(obj)
-        if obj:IsA("GuiObject") then white blox_CARD_DIRTY = true end
+if WHITE_BLOX_PLAYER_GUI then
+    WHITE_BLOX_PLAYER_GUI.DescendantAdded:Connect(function(obj)
+        if obj:IsA("GuiObject") then WHITE_BLOX_CARD_DIRTY = true end
     end)
-    white blox_PLAYER_GUI.DescendantRemoving:Connect(function(obj)
-        if obj:IsA("GuiObject") then white blox_CARD_DIRTY = true end
+    WHITE_BLOX_PLAYER_GUI.DescendantRemoving:Connect(function(obj)
+        if obj:IsA("GuiObject") then WHITE_BLOX_CARD_DIRTY = true end
     end)
 end
 
 -- Lightweight fallback. 0.20 s is still effectively instant for a card-selection screen.
 task.spawn(function()
     while task.wait(0.20) do
-        if v32.AutoCardSelect and not white blox_CARD_BUSY and (os.clock() - white blox_CARD_LAST) >= 0.75 then
-            local card = white blox_FindCard()
+        if v32.AutoCardSelect and not WHITE_BLOX_CARD_BUSY and (os.clock() - WHITE_BLOX_CARD_LAST) >= 0.75 then
+            local card = WHITE_BLOX_FindCard()
             if card then
-                white blox_CARD_BUSY = true
+                WHITE_BLOX_CARD_BUSY = true
                 task.spawn(function()
                     task.wait(math.max(0, tonumber(v32.CardSelectDelay) or 0.08))
-                    if v32.AutoCardSelect and card and card.Parent and white blox_GuiVisible(card) then
-                        if white blox_ClickGuiButton(card) then
-                            white blox_CARD_LAST = os.clock()
-                            white blox_CARD_DIRTY = true
+                    if v32.AutoCardSelect and card and card.Parent and WHITE_BLOX_GuiVisible(card) then
+                        if WHITE_BLOX_ClickGuiButton(card) then
+                            WHITE_BLOX_CARD_LAST = os.clock()
+                            WHITE_BLOX_CARD_DIRTY = true
                         end
                     end
-                    white blox_CARD_BUSY = false
+                    WHITE_BLOX_CARD_BUSY = false
                 end)
             end
         end
@@ -7035,7 +7035,7 @@ v98:AddToggle({
     ["Default"]=v32.AutoCardSelect,
     ["Callback"]=function(v)
         v32.AutoCardSelect = v and true or false
-        white blox_CARD_DIRTY = true
+        WHITE_BLOX_CARD_DIRTY = true
         v37()
     end
 })
